@@ -1,0 +1,117 @@
+"""피싱 URL 분석 API 서버.
+
+실행 (backend/ 폴더에서):
+    uvicorn app.main:app --reload
+"""
+
+import os
+import uuid
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Literal
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+
+# backend/.env의 값을 환경변수로 읽어온다 (이미 설정된 환경변수가 우선)
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+from app import db  # noqa: E402
+from app.schemas import (
+    AiAnalysis,
+    AnalysisListResponse,
+    AnalysisRequest,
+    AnalysisResponse,
+    ClientResponse,
+    HealthResponse,
+    ModelResult,
+)
+from app.services import blacklist, model, rag, verdict
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 첫 요청이 느려지지 않도록 서버 시작 시 블랙리스트를 미리 로드
+    blacklist.load_blacklist()
+    db.init_db()
+    rag.load_rag()
+    yield
+
+
+app = FastAPI(title="피싱 URL 분석 API", version="0.1.0", lifespan=lifespan)
+
+# 프론트 개발 서버(Vite)에서 오는 요청을 허용. 쉼표로 여러 주소 지정 가능
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=(os.environ.get("CORS_ORIGINS") or "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health", response_model=HealthResponse)
+def health():
+    return HealthResponse(status="ok")
+
+
+def _client_key(client_id: uuid.UUID | None) -> str | None:
+    """헤더의 브라우저 ID를 DB에 저장하는 형태(소문자 UUID 문자열)로 바꾼다."""
+    return str(client_id) if client_id else None
+
+
+@app.post("/api/v1/clients", response_model=ClientResponse)
+def create_client():
+    """브라우저 ID 발급. 프론트는 로컬스토리지에 저장해두고 X-Client-Id 헤더로 보낸다."""
+    return ClientResponse(client_id=str(uuid.uuid4()))
+
+
+@app.post("/api/v1/analyses", response_model=AnalysisResponse)
+def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = Header(None)):
+    blacklist_result = blacklist.check_blacklist(request.url)
+    # 블랙리스트에 있으면 피싱으로 확정되므로 RAG/ML은 돌리지 않는다 (팀 합의)
+    if blacklist_result.matched:
+        rag_result = rag.RagResult()
+        model_result = ModelResult(status="not_ready")
+    else:
+        rag_result = rag.explain(request.url)
+        model_result = model.predict(request.url)
+
+    result = AnalysisResponse(
+        id=str(uuid.uuid4()),
+        status="completed",
+        url=request.url,
+        is_public=request.is_public,
+        **verdict.decide(blacklist_result, model_result),
+        ai_analysis=AiAnalysis(summary=rag_result.summary),
+        extracted_features=rag_result.features,
+        similar_cases=rag_result.similar_cases,
+        blacklist=blacklist_result,
+        rag=rag_result.reference,
+        model=model_result,
+    )
+    db.save_analysis(result, _client_key(x_client_id))
+    return result
+
+
+@app.get("/api/v1/analyses", response_model=AnalysisListResponse)
+def list_analyses(
+    scope: Literal["mine", "public"],
+    limit: int = Query(20, ge=1, le=100),
+    x_client_id: uuid.UUID | None = Header(None),
+):
+    """scope=mine: 이 브라우저의 기록 / scope=public: 공개된 기록."""
+    if scope == "public":
+        return AnalysisListResponse(items=db.list_analyses(limit))
+    if x_client_id is None:
+        raise HTTPException(status_code=400, detail="X-Client-Id 헤더가 필요합니다.")
+    return AnalysisListResponse(items=db.list_analyses(limit, _client_key(x_client_id)))
+
+
+@app.get("/api/v1/analyses/{analysis_id}", response_model=AnalysisResponse)
+def read_analysis(analysis_id: str, x_client_id: uuid.UUID | None = Header(None)):
+    # 비공개 결과는 만든 브라우저에서만 보인다. 남의 비공개 결과도 "없음"으로 응답한다
+    result = db.get_analysis(analysis_id, _client_key(x_client_id))
+    if result is None:
+        raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
+    return result
