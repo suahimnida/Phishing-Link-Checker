@@ -1,0 +1,273 @@
+import { useEffect, useState } from "react";
+import "./History.css";
+
+const API_BASE_URL = "http://localhost:8000";
+const CLIENT_ID_KEY = "phishingClientId";
+
+async function getClientId() {
+  const savedClientId = localStorage.getItem(CLIENT_ID_KEY);
+
+  if (savedClientId) {
+    return savedClientId;
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/clients`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `클라이언트 ID 발급 실패: ${response.status}`
+    );
+  }
+
+  const data = await response.json();
+
+  localStorage.setItem(
+    CLIENT_ID_KEY,
+    data.client_id
+  );
+
+  return data.client_id;
+}
+
+function History({ onViewResult }) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const clientId = await getClientId();
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/v1/analyses?scope=mine`,
+          {
+            headers: {
+              "X-Client-Id": clientId,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `분석 기록 조회 실패: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        setHistory(
+          Array.isArray(data.items)
+            ? data.items
+            : []
+        );
+      } catch (error) {
+        console.error(
+          "분석 기록을 불러오지 못했습니다:",
+          error
+        );
+        setHistory([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, []);
+
+  const handleViewResult = async (item) => {
+    try {
+      const clientId = await getClientId();
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/analyses/${item.id}`,
+        {
+          headers: {
+            "X-Client-Id": clientId,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `분석 결과 조회 실패: ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+
+      onViewResult(result);
+    } catch (error) {
+      console.error(
+        "분석 결과를 불러오지 못했습니다:",
+        error
+      );
+
+      alert(
+        "분석 결과를 불러오지 못했습니다."
+      );
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) {
+      return "-";
+    }
+
+    return new Date(dateString).toLocaleString(
+      "ko-KR",
+      {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
+  };
+
+  const getRiskStatus = (verdict) => {
+    if (verdict === "phishing") {
+      return {
+        label: "피싱 의심",
+        className: "danger",
+      };
+    }
+
+    if (verdict === "suspicious") {
+      return {
+        label: "주의 필요",
+        className: "warning",
+      };
+    }
+
+    return {
+      label: "정상",
+      className: "normal",
+    };
+  };
+
+  if (loading) {
+    return (
+      <section className="history-page">
+        <div className="history-header">
+          <div>
+            <p className="history-eyebrow">
+              ANALYSIS HISTORY
+            </p>
+
+            <h2>분석 기록</h2>
+
+            <p className="history-description">
+              이전에 분석한 웹사이트의 결과를 확인할 수 있습니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="history-empty">
+          <h3>분석 기록을 불러오는 중입니다.</h3>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="history-page">
+      {/* Header */}
+      <div className="history-header">
+        <div>
+          <p className="history-eyebrow">
+            ANALYSIS HISTORY
+          </p>
+
+          <h2>분석 기록</h2>
+
+          <p className="history-description">
+            이전에 분석한 웹사이트의 결과를 확인할 수 있습니다.
+          </p>
+        </div>
+
+        <div className="history-count">
+          <span>{history.length}</span>
+          <small>건</small>
+        </div>
+      </div>
+
+      {/* Empty */}
+      {history.length === 0 ? (
+        <div className="history-empty">
+          <div className="history-empty-icon">
+            ◷
+          </div>
+
+          <h3>분석 기록이 없습니다.</h3>
+
+          <p>
+            웹사이트를 분석하면
+            <br />
+            이곳에서 분석 기록을 확인할 수 있습니다.
+          </p>
+        </div>
+      ) : (
+        <div className="history-list">
+          {history.map((item) => {
+            const riskStatus = getRiskStatus(
+              item.verdict
+            );
+
+            return (
+              <article
+                className="history-card"
+                key={item.id}
+              >
+                <div className="history-card-main">
+                  {/* Status / Date */}
+                  <div className="history-card-top">
+                    <span
+                      className={`history-status ${riskStatus.className}`}
+                    >
+                      {riskStatus.label}
+                    </span>
+
+                    <span className="history-date">
+                      {formatDate(item.created_at)}
+                    </span>
+                  </div>
+
+                  {/* URL */}
+                  <h3>{item.url}</h3>
+
+                  {/* Summary */}
+                  <p>
+                    분석 결과를 확인하려면
+                    결과 보기를 눌러주세요.
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="history-card-actions">
+                  <button
+                    className="history-view-button"
+                    onClick={() =>
+                      handleViewResult(item)
+                    }
+                  >
+                    결과 보기
+                    <span>→</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default History;
+

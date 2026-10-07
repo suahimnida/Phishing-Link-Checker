@@ -1,0 +1,284 @@
+.analysis-page {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding-bottom: 60px;
+}
+
+.analysis-header {
+  padding: 45px 0 30px;
+}
+
+.analysis-header h2 {
+  margin-top: 8px;
+  font-size: clamp(36px, 4vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.analysis-description {
+  max-width: 600px;
+  margin-top: 16px;
+  color: #899291;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Target URL */
+
+.target-card {
+  padding: 20px 22px;
+  background: #131617;
+  border: 1px solid #292e2f;
+  border-radius: 10px;
+}
+
+.target-label {
+  margin-bottom: 9px;
+  color: #687270;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.target-url {
+  overflow: hidden;
+  color: #f4f7f6;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Pipeline */
+
+.pipeline-card {
+  margin-top: 16px;
+  padding: 26px;
+  background: #131617;
+  border: 1px solid #292e2f;
+  border-radius: 10px;
+}
+
+.pipeline-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #292e2f;
+}
+
+.pipeline-label {
+  color: #687270;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.pipeline-header h3 {
+  margin-top: 7px;
+  font-size: 18px;
+}
+
+.pipeline-status {
+  padding: 6px 9px;
+  border: 1px solid rgba(66, 232, 196, 0.25);
+  border-radius: 5px;
+  background: rgba(66, 232, 196, 0.08);
+  color: #42e8c4;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Steps */
+
+.analysis-steps {
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-step {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #292e2f;
+}
+
+.analysis-step:last-child {
+  border-bottom: none;
+}
+
+.step-icon {
+  width: 28px;
+  flex-shrink: 0;
+  color: #4f5755;
+  font-size: 16px;
+  text-align: center;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-content h4 {
+  color: #899291;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.step-content p {
+  margin-top: 5px;
+  color: #59615f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.step-status {
+  flex-shrink: 0;
+  color: #4f5755;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Completed */
+
+.analysis-step.completed .step-icon {
+  color: #42e8c4;
+}
+
+.analysis-step.completed .step-content h4 {
+  color: #f4f7f6;
+}
+
+.analysis-step.completed .step-status {
+  color: #42e8c4;
+}
+
+/* Active */
+
+.analysis-step.active {
+  background: rgba(66, 232, 196, 0.025);
+}
+
+.analysis-step.active .step-icon {
+  color: #42e8c4;
+  animation: pulse 1.2s infinite;
+}
+
+.analysis-step.active .step-content h4 {
+  color: #f4f7f6;
+}
+
+.analysis-step.active .step-status {
+  color: #42e8c4;
+}
+
+/* Footer */
+
+.analysis-footer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+  color: #687270;
+  font-size: 11px;
+}
+
+.loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #42e8c4;
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Responsive */
+
+@media (max-width: 600px) {
+  .analysis-header {
+    padding-top: 25px;
+  }
+
+  .pipeline-card {
+    padding: 18px;
+  }
+
+  .analysis-step {
+    gap: 10px;
+  }
+
+  .step-status {
+    display: none;
+  }
+}
+
+.analysis-error {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 77, 90, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 77, 90, 0.08);
+}
+
+.analysis-error strong {
+  display: block;
+  color: #ff6b75;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.analysis-error p {
+  color: #b7bfbd;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pipeline-status.error {
+  color: #ff6b75;
+  border-color: rgba(255, 77, 90, 0.35);
+}
+
+.partial-result-button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 16px 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: 1px solid #42e8c4;
+  border-radius: 10px;
+
+  background: rgba(66, 232, 196, 0.08);
+  color: #42e8c4;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.partial-result-button:hover {
+  background: rgba(66, 232, 196, 0.14);
+  transform: translateY(-1px);
+}
+
+.partial-result-button span {
+  font-size: 18px;
+}

@@ -1,0 +1,113 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+
+  background: #0a0c0d;
+  color: #f4f7f6;
+
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* =========================
+   Header
+========================= */
+
+.header {
+  width: 100%;
+  height: 64px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 28px;
+
+  background: #0d1011;
+  border-bottom: 1px solid #292e2f;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-mark {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 7px;
+
+  background: #42e8c4;
+  color: #0a0c0d;
+
+  font-weight: 900;
+}
+
+.header-logo h1 {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.header-logo span {
+  display: block;
+
+  margin-top: 2px;
+
+  color: #687270;
+
+  font-size: 10px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color: #899291;
+
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: #42e8c4;
+
+  box-shadow: 0 0 8px rgba(66, 232, 196, 0.6);
+}

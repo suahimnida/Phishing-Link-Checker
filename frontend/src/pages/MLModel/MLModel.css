@@ -1,0 +1,284 @@
+.ml-model-page {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-bottom: 60px;
+}
+
+.ml-model-header {
+  margin-bottom: 42px;
+}
+
+.ml-model-eyebrow {
+  margin: 0 0 10px;
+  color: #42e8c4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+}
+
+.ml-model-header h2 {
+  margin: 0 0 14px;
+  color: #f4f7f6;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.ml-model-description {
+  max-width: 620px;
+  margin: 0;
+  color: #899291;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* Overview */
+
+.ml-overview {
+  margin-bottom: 42px;
+  padding: 30px;
+  background: #131617;
+  border: 1px solid #292e2f;
+  border-radius: 14px;
+}
+
+.ml-overview-content {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.ml-section-number {
+  flex-shrink: 0;
+  color: #42e8c4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.ml-overview h3 {
+  margin: 0 0 12px;
+  color: #f4f7f6;
+  font-size: 20px;
+}
+
+.ml-overview p {
+  max-width: 760px;
+  margin: 0;
+  color: #899291;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* Section */
+
+.ml-section {
+  margin-bottom: 42px;
+}
+
+.ml-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.ml-section-header h3 {
+  margin: 0;
+  color: #f4f7f6;
+  font-size: 20px;
+}
+
+.ml-section-header > span {
+  color: #899291;
+  font-size: 12px;
+}
+
+/* Features */
+
+.ml-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.ml-feature-card {
+  min-height: 100px;
+  padding: 20px;
+  background: #131617;
+  border: 1px solid #292e2f;
+  border-radius: 12px;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.ml-feature-card:hover {
+  border-color: #42e8c4;
+  transform: translateY(-2px);
+}
+
+.ml-feature-card span {
+  display: block;
+  margin-bottom: 22px;
+  color: #42e8c4;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ml-feature-card strong {
+  color: #f4f7f6;
+  font-size: 14px;
+}
+
+/* Flow */
+
+.ml-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.ml-flow-item {
+  flex: 1;
+  min-width: 0;
+  padding: 22px 18px;
+  background: #131617;
+  border: 1px solid #292e2f;
+  border-radius: 12px;
+}
+
+.ml-flow-item span {
+  display: block;
+  margin-bottom: 18px;
+  color: #42e8c4;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ml-flow-item strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #f4f7f6;
+  font-size: 14px;
+}
+
+.ml-flow-item p {
+  margin: 0;
+  color: #899291;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ml-flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #42e8c4;
+  font-size: 18px;
+}
+
+/* Info */
+
+.ml-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.ml-info-card {
+  padding: 22px;
+  background: #131617;
+  border: 1px solid #292e2f;
+  border-radius: 12px;
+}
+
+.ml-info-card span {
+  display: block;
+  margin-bottom: 10px;
+  color: #899291;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+}
+
+.ml-info-card strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #f4f7f6;
+  font-size: 15px;
+}
+
+.ml-info-card p {
+  margin: 0;
+  color: #899291;
+  font-size: 12px;
+}
+
+/* Responsive */
+
+@media (max-width: 800px) {
+  .ml-feature-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ml-flow {
+    flex-wrap: wrap;
+  }
+
+  .ml-flow-item {
+    flex: 1 1 calc(50% - 30px);
+  }
+
+  .ml-flow-arrow {
+    display: none;
+  }
+
+  .ml-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .ml-model-page {
+    padding-bottom: 40px;
+  }
+
+  .ml-model-header h2 {
+    font-size: 27px;
+  }
+
+  .ml-overview {
+    padding: 22px;
+  }
+
+  .ml-overview-content {
+    gap: 16px;
+  }
+
+  .ml-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ml-feature-card {
+    min-height: auto;
+  }
+
+  .ml-flow {
+    flex-direction: column;
+  }
+
+  .ml-flow-item {
+    flex: none;
+    width: 100%;
+  }
+
+  .ml-section-header {
+    align-items: flex-start;
+    gap: 10px;
+    flex-direction: column;
+  }
+}
+
