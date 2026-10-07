@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./History.css";
 
-const API_BASE_URL = "http://localhost:8000";
+import { API_BASE_URL } from "../../services/api";
 const CLIENT_ID_KEY = "phishingClientId";
 
 async function getClientId() {
