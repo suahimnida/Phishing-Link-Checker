@@ -34,7 +34,7 @@ class RagResult(BaseModel):
 
 _CODES_DIR = Path(__file__).resolve().parents[3] / "codes"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-CLAUDE_MODEL = "claude-opus-4-7"
+CLAUDE_MODEL = os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-4"
 
 SYSTEM_PROMPT = (
     "당신은 피싱 URL 탐지 전문가입니다. '유사 사례'는 과거에 실제로 피싱/정상으로 "
@@ -75,8 +75,14 @@ def load_rag() -> bool:
     if not index_path.exists() or not meta_path.exists():
         logger.warning("RAG 비활성화: 벡터 스토어가 없습니다 (%s)", _index_dir())
         return False
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        logger.warning("RAG 비활성화: ANTHROPIC_API_KEY가 설정되지 않았습니다")
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    auth_token = os.environ.get("ANTHROPIC_AUTH_TOKEN")
+    
+    if not api_key and not auth_token:
+        logger.warning(
+            "RAG 비활성화: ANTHROPIC_API_KEY 또는 ANTHROPIC_AUTH_TOKEN이 설정되지 않았습니다"
+            )
         return False
 
     # 무거운 라이브러리는 실제로 쓸 때만 불러온다
@@ -89,13 +95,21 @@ def load_rag() -> bool:
     if str(_CODES_DIR) not in sys.path:
         sys.path.append(str(_CODES_DIR))
     from preprocess import extract_features
-
+    
+    client_kwargs = {}
+    if os.environ.get("ANTHROPIC_BASE_URL"):
+        client_kwargs["base_url"] = os.environ.get("ANTHROPIC_BASE_URL")
+    if auth_token:
+        client_kwargs["auth_token"] = auth_token
+    elif api_key:
+        client_kwargs["api_key"] = api_key
+        
     _state = {
         "extract_features": extract_features,
         "embed_model": SentenceTransformer(EMBEDDING_MODEL_NAME),
         "index": faiss.read_index(str(index_path)),
         "metadata": pd.read_json(meta_path, lines=True),
-        "client": anthropic.Anthropic(),
+        "client": anthropic.Anthropic(**client_kwargs),
     }
     logger.info("RAG 로드 완료: 사례 %d건", len(_state["metadata"]))
     return True
