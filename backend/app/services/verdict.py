@@ -14,13 +14,33 @@ HOMOGRAPH_FLOOR = 90.0
 MIXED_SCRIPT_FLOOR = 30.0
 
 
+# 공식 도메인 목록으로 정한 정상 판정의 신뢰도. ML 점수가 아니라 목록 일치로 정한 판정이므로 높게 둔다.
+ALLOWLIST_CONFIDENCE = 0.95
+
+
+def confidence(verdict: str, score: float) -> float:
+    """판정 쪽으로 점수가 얼마나 기울었는지 (0~1).
+
+    예전 공식 |점수-50|/50은 정상 25점을 50%로 표시해, 정상인데 신뢰도가 낮아 보였다 (QA).
+    - 정상: 1 - 점수/100 (25점 → 75%, 2.1점 → 98%)
+    - 피싱: 점수/100 (99.9점 → 100%, 60점 → 60%)
+    - 의심: 0.5 (정상과 피싱 사이에서 판단을 보류한 상태)
+    """
+    if verdict == "normal":
+        return round(1 - score / 100, 2)
+    if verdict == "phishing":
+        return round(score / 100, 2)
+    return 0.5
+
+
 def _with_score(result: dict, score: float, verdict: str | None = None) -> None:
     score = round(score, 2)
+    verdict = verdict or ("phishing" if score >= 60 else "suspicious" if score >= 30 else "normal")
     result.update(
-        verdict=verdict or ("phishing" if score >= 60 else "suspicious" if score >= 30 else "normal"),
+        verdict=verdict,
         risk_score=score,
         risk_level=risk_judge.risk_level_from_score(score),
-        confidence=round(abs(score - 50) / 50, 2),
+        confidence=confidence(verdict, score),
     )
 
 
@@ -37,8 +57,10 @@ def decide(blacklist: BlacklistResult, model_result: ModelResult, allow: Allowli
     if blacklist.matched:
         return {key: result[key] for key in _EMPTY}
 
-    if allow is not None and allow.matched and result["risk_score"] > ALLOWLIST_CAP:
-        _with_score(result, ALLOWLIST_CAP, "normal")
+    _with_score(result, result["risk_score"])
+    if allow is not None and allow.matched:
+        _with_score(result, min(result["risk_score"], ALLOWLIST_CAP), "normal")
+        result["confidence"] = ALLOWLIST_CONFIDENCE
     if shortener:
         low, high = SHORTENER_RANGE
         _with_score(result, min(max(result["risk_score"], low), high), "suspicious")

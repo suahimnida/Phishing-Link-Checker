@@ -60,14 +60,18 @@ def build_evidence(*, verdict, risk_score, blacklist, allowlist, model, explanat
     allowlisted = allowlist.matched and not blacklist.matched
     shortened = shortener and not blacklist.matched
     ml_ready = model.status == "ready" and model.risk_score is not None
-    ml_note = f"URL 문자 패턴 점수({model.risk_score:g}점)와 관계없이 " if ml_ready else ""
 
     # 최종 판정을 ML 점수와 다르게 정한 이유를 판정 바로 다음 근거로 둔다.
     # 이때는 ML 원점수를 따로 내세우지 않는다 (QA: 정상 25점인데 "ML 점수가 매우 높다"고 설명하던 문제)
+    # 원점수 숫자는 넣지 않는다. 숫자가 있으면 LLM이 "ML 점수가 88.54점으로 매우 높게" 같은 문장을 써서
+    # 최종 판정과 충돌했다 (QA). 원점수는 화면의 ML 모델 섹션에 참고용으로만 보인다.
     if allowlisted:
-        add("공식 도메인 허용 목록", f"{allowlist.domain}은(는) 공식 도메인 목록에 있어, {ml_note}정상으로 판정했습니다.", True)
+        add("공식 도메인 허용 목록",
+            f"{allowlist.domain}은(는) 공식 도메인 목록에 있는 사이트라 정상으로 판정했습니다. "
+            "공식 도메인에서는 URL 문자 패턴 점수를 판정에 쓰지 않습니다.", True)
     if shortened:
-        add("단축 URL", f"단축 URL이라 실제로 이동할 주소를 URL만으로 확인할 수 없어, {ml_note}'피싱 의심'으로 표시합니다.", True)
+        add("단축 URL", "단축 URL이라 실제로 이동할 주소를 URL만으로 확인할 수 없어, URL 문자 패턴 점수와 관계없이 "
+            "'피싱 의심'으로 표시합니다.", True)
     if homograph is not None and getattr(homograph, "matched", False) and not blacklist.matched:
         if homograph.imitates:
             add("동형 문자 도메인",

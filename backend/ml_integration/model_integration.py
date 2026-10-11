@@ -50,10 +50,13 @@ def model_info() -> dict:
     """배포 환경에서 어떤 모델이 로드됐는지 확인하기 위한 정보 (/health와 시작 로그에 표시)."""
     import hashlib
 
+    import numpy
+    import scipy
     import sklearn
 
-    info = {"sklearn": sklearn.__version__, "model": None, "sha256": None, "trained_at": None,
-            "trained_sklearn": None}
+    # 배포와 로컬의 점수가 다를 때 라이브러리 버전부터 비교할 수 있게 함께 보여 준다
+    info = {"sklearn": sklearn.__version__, "numpy": numpy.__version__, "scipy": scipy.__version__,
+            "model": None, "sha256": None, "trained_at": None, "trained_sklearn": None}
     v2 = _load_v2()
     if v2 is None:
         _load_artifacts()

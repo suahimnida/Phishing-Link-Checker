@@ -172,3 +172,39 @@ def test_allowlisted_evidence_does_not_cite_high_ml_score_or_cases():
     assert sources[0] == "최종 판정"
     assert "ML 모델" not in sources and "유사 사례" not in sources
     assert "정상으로 판정" in evidence[1]["text"]
+
+
+def test_allowlisted_evidence_has_no_raw_ml_number():
+    from app.schemas import Detections
+
+    evidence = guides.build_evidence(
+        verdict="normal", risk_score=25.0, blacklist=BlacklistResult(matched=False, match_type="none", source="KISA 2024"),
+        allowlist=AllowlistResult(matched=True, domain="naver.com"),
+        model=ModelResult(status="ready", risk_score=88.54, label="phishing"), explanation=None,
+        detections=Detections(), similar_cases=[],
+    )
+    assert all("88.54" not in e["text"] for e in evidence)
+
+
+# ---------- 신뢰도 ----------
+
+NONE = BlacklistResult(matched=False, match_type="none", source="KISA 2024")
+
+
+@pytest.mark.parametrize("score,expected", [(2.1, 0.98), (20.8, 0.79), (25.0, 0.75), (45.0, 0.5), (60.0, 0.6), (99.9, 1.0)])
+def test_confidence_leans_toward_verdict(score, expected):
+    decided = verdict.decide(NONE, ModelResult(status="ready", risk_score=score, label="normal"), AllowlistResult())
+    assert decided["confidence"] == expected
+
+
+@pytest.mark.parametrize("ml", [2.1, 88.54, 99.53])
+def test_allowlisted_normal_has_high_confidence(ml):
+    decided = verdict.decide(NONE, ModelResult(status="ready", risk_score=ml, label="normal"),
+                             AllowlistResult(matched=True, domain="naver.com"))
+    assert decided["verdict"] == "normal" and decided["risk_score"] <= 25 and decided["confidence"] == 0.95
+
+
+def test_schemeless_host_explains_deployed_score_gap():
+    # 배포 88.54점 / 로컬 99.5점 차이의 원인: 'nid.naver.com'(도메인만)과 로그인 경로 URL은 다른 입력이다
+    assert predict_model("nid.naver.com")["risk_score"] == pytest.approx(88.54, abs=0.5)
+    assert predict_model("https://nid.naver.com/nidlogin.login")["risk_score"] == pytest.approx(99.53, abs=0.5)
