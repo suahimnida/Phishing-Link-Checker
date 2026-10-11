@@ -103,6 +103,21 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       : null;
 
   // 백엔드는 신뢰도를 0~1 비율로 보낸다 (예: 0.91). 화면에는 퍼센트로 표시한다
+  // 공식 도메인(허용 목록)이면 ML 점수는 참고용이다. 최종 판정과 충돌해 보이지 않게 표시한다 (QA)
+  const modelReferenceOnly =
+    Boolean(data.allowlist?.matched) && !data.blacklist?.matched;
+  // 모델 판정도 최종 판정과 같은 기준(30점·60점)으로 표시한다.
+  // 예전에는 60점 미만을 모두 '정상'으로 표시해, 최종 '의심'(31점)인데 모델 판정은 '정상'으로 보였다 (QA)
+  const modelScore = data.model?.risk_score;
+  const modelLabel =
+    modelScore === null || modelScore === undefined
+      ? "아직 판정되지 않았습니다."
+      : modelScore >= 60
+      ? "피싱"
+      : modelScore >= 30
+      ? "의심"
+      : "정상";
+
   const confidence =
     data.confidence !== null &&
     data.confidence !== undefined
@@ -508,7 +523,7 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
                   null &&
                 data.model?.risk_score !==
                   undefined
-                  ? `${data.model.risk_score} / 100`
+                  ? `${data.model.risk_score} / 100${modelReferenceOnly ? " (참고용)" : ""}`
                   : "아직 산출되지 않았습니다."}
               </p>
             </div>
@@ -523,13 +538,9 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
               <h4>모델 판정</h4>
 
               <p>
-                {data.model?.label ===
-                "phishing"
-                  ? "피싱"
-                  : data.model?.label ===
-                    "normal"
-                  ? "정상"
-                  : "아직 판정되지 않았습니다."}
+                {modelLabel}
+                {modelReferenceOnly &&
+                  " · 공식 도메인이라 최종 판정에는 반영되지 않았습니다."}
               </p>
             </div>
           </div>
