@@ -7,7 +7,7 @@ import History from "./pages/History/History";
 import DetectionMethods from "./pages/DetectionMethods/DetectionMethods";
 import Dataset from "./pages/Dataset/Dataset";
 import MLModel from "./pages/MLModel/MLModel";
-import { getSharedAnalysis } from "./services/api";
+import { getSharedAnalysis, wakeServer } from "./services/api";
 import "./App.css";
 
 function App() {
@@ -35,6 +35,11 @@ function App() {
     setHistoryTab("mine");
     setCurrentPage("history");
   };
+
+  // 사이트를 열면 백엔드를 미리 깨운다 (무료 서버 콜드 스타트 대기 줄이기)
+  useEffect(() => {
+    wakeServer();
+  }, []);
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("share");

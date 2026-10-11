@@ -118,6 +118,8 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       ? "의심"
       : "정상";
 
+  const unsaved = data.saved === false;
+
   const confidence =
     data.confidence !== null &&
     data.confidence !== undefined
@@ -139,7 +141,18 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
 
       {/* 분석 범위: 사이트에 접속하지 않았다는 점을 결과보다 먼저 밝힌다 */}
       {/* 공개 범위와 "링크가 있는 사람은 볼 수 있음" */}
-      {data.viewer && <ShareControls result={data} onChange={onResultChange} />}
+      {/* 서버가 결과를 저장하지 못한 경우: 공유·리포트·삭제는 저장된 결과에만 쓸 수 있다 */}
+      {unsaved && (
+        <div className="analysis-scope">
+          <strong>결과가 저장되지 않았습니다</strong>
+          <p>
+            일시적인 저장소 문제로 이 결과는 기록에 남지 않았습니다. 분석 결과는 그대로 볼 수
+            있지만 공유, 리포트, 삭제는 할 수 없습니다. 기록이 필요하면 잠시 후 다시 분석해 주세요.
+          </p>
+        </div>
+      )}
+
+      {data.viewer && !unsaved && <ShareControls result={data} onChange={onResultChange} />}
 
       <div className="analysis-scope">
         <strong>분석 범위</strong>
@@ -589,10 +602,10 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
         )}
 
       {/* Report: 리포트 생성, PDF 보기·저장. 다른 분석 결과로 바뀌면 key로 상태를 초기화한다 */}
-      {data.id && <ReportSection key={data.id} analysisId={data.id} shareToken={shareToken} />}
+      {data.id && !unsaved && <ReportSection key={data.id} analysisId={data.id} shareToken={shareToken} />}
 
       {/* 분석 결과 삭제: 공개 결과만. 분석할 때 입력한 사용자 식별 암호로 본인을 확인한다 */}
-      {data.id && data.is_public && <DeleteSection analysisId={data.id} onDeleted={onDeleted} />}
+      {data.id && data.is_public && !unsaved && <DeleteSection analysisId={data.id} onDeleted={onDeleted} />}
     </section>
   );
 }

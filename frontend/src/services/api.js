@@ -3,14 +3,47 @@ export const API_BASE_URL =
 
 const CLIENT_ID_KEY = "phishingClientId";
 
+// 서버가 보낸 오류 설명(detail)을 사람이 읽을 문장으로 꺼낸다.
+// 입력 오류(422)는 [{ msg: "Value error, url이 비어 있습니다." }] 형태로 온다.
+async function readDetail(response) {
+  try {
+    const body = await response.json();
+    const detail = body?.detail;
+    if (Array.isArray(detail) && detail[0]?.msg) {
+      return String(detail[0].msg).replace(/^Value error,\s*/, "");
+    }
+    return typeof detail === "string" ? detail : "";
+  } catch {
+    return "";
+  }
+}
+
+// 공통 요청 함수: 실패하면 status(HTTP 상태 코드)와 detail(서버 설명)을 담은 에러를 던진다.
+// 서버에 닿지 못한 경우(네트워크 오류, 서버가 잠든 상태)는 status가 0이다.
 async function request(path, options, errorMessage) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, options);
+  } catch (networkError) {
+    const error = new Error(`${errorMessage}: 서버에 연결하지 못했습니다`);
+    error.status = 0;
+    error.cause = networkError;
+    throw error;
+  }
 
   if (!response.ok) {
-    throw new Error(`${errorMessage}: ${response.status}`);
+    const error = new Error(`${errorMessage}: ${response.status}`);
+    error.status = response.status;
+    error.detail = await readDetail(response);
+    throw error;
   }
 
   return response.json();
+}
+
+// 무료 서버는 한동안 요청이 없으면 잠든다. 사이트를 열자마자 깨워 두면 첫 분석이 빨라진다.
+export function wakeServer() {
+  fetch(`${API_BASE_URL}/health`).catch(() => {});
 }
 
 export function getSavedClientId() {

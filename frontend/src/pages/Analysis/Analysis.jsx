@@ -26,16 +26,43 @@ const analysisSteps = [
   },
 ];
 
+// 오류 종류별 안내. 예전에는 입력 오류(422)도 "서버에 연결할 수 없습니다"로 보였다 (QA)
+function describeError(error) {
+  if (error?.status === 422) {
+    return {
+      title: "입력한 주소를 분석할 수 없습니다.",
+      message: error.detail || "URL 형식을 확인해 주세요. 예: https://example.com",
+    };
+  }
+  if (error?.status === 503) {
+    return {
+      title: "저장소에 잠시 연결할 수 없습니다.",
+      message: "잠시 후 다시 시도해 주세요.",
+    };
+  }
+  if (error?.status) {
+    return {
+      title: "분석 중 서버 오류가 발생했습니다.",
+      message: "잠시 후 다시 시도해 주세요.",
+    };
+  }
+  return {
+    title: "분석 서버에 연결할 수 없습니다.",
+    message:
+      "서버가 잠들어 있으면 깨어나는 데 30초~1분 정도 걸릴 수 있습니다. 잠시 후 다시 시도해 주세요.",
+  };
+}
+
 function Analysis({ url, isPublic, ownerName, ownerSecret, onComplete }) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
 
     const runAnalysis = async () => {
       try {
-        setError("");
+        setError(null);
         setCurrentStep(0);
 
         const result = await analyzeUrl(url, isPublic, ownerName, ownerSecret);
@@ -47,9 +74,7 @@ function Analysis({ url, isPublic, ownerName, ownerSecret, onComplete }) {
         console.error("분석 요청 실패:", error);
 
         if (!cancelled) {
-          setError(
-            "분석 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
-          );
+          setError(describeError(error));
         }
       }
     };
@@ -110,7 +135,7 @@ function Analysis({ url, isPublic, ownerName, ownerSecret, onComplete }) {
           <span
             className={`pipeline-status ${error ? "error" : ""}`}
           >
-            {error ? "연결 오류" : "분석 중"}
+            {error ? "오류" : "분석 중"}
           </span>
         </div>
 
@@ -154,11 +179,9 @@ function Analysis({ url, isPublic, ownerName, ownerSecret, onComplete }) {
 
       {error ? (
         <div className="analysis-error">
-          <strong>분석 서버에 연결할 수 없습니다.</strong>
+          <strong>{error.title}</strong>
 
-          <p>
-            백엔드 서버가 실행 중인지 확인한 후 다시 시도해주세요.
-          </p>
+          <p>{error.message}</p>
         </div>
       ) : (
         <div className="analysis-footer">
