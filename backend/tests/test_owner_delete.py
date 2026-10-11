@@ -12,11 +12,7 @@ SECRET = "Abc123Xyz789"
 CONFIRM = "분석 결과를 삭제하겠습니다"
 
 
-@pytest.fixture(autouse=True)
-def reset_lock():
-    owner._failures.clear()
-    yield
-    owner._failures.clear()
+# 실패 기록은 DB(owner_failures)에 분석 id별로 저장된다. 테스트마다 새 분석을 만들므로 따로 지울 필요가 없다.
 
 
 def analyze(is_public=True, name="김수아", secret=SECRET) -> dict:

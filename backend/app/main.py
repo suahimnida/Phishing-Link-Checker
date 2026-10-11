@@ -1,4 +1,6 @@
 import logging
+import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 import os
@@ -8,13 +10,37 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     [%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+
+class _RedactShareToken(logging.Filter):
+    """접속 로그에 공유 토큰이 남지 않게 가린다 (?share=토큰, /shared/토큰). 토큰이 곧 열람 권한이다."""
+
+    _patterns = (re.compile(r"(share=)[^&\s\"]+"), re.compile(r"(/shared/)[^?\s\"]+"))
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.args:
+            record.args = tuple(self._redact(a) if isinstance(a, str) else a for a in record.args)
+        if isinstance(record.msg, str):
+            record.msg = self._redact(record.msg)
+        return True
+
+    def _redact(self, text: str) -> str:
+        for pattern in self._patterns:
+            text = pattern.sub(r"\1***", text)
+        return text
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactShareToken())
+for _handler in logging.getLogger().handlers:  # 앱 로그(app.*)도 같은 처리
+    _handler.addFilter(_RedactShareToken())
 
 from app import db 
 from app.schemas import (
@@ -98,10 +124,53 @@ app.add_middleware(
 )
 
 
+def _is_db_error(error: Exception) -> bool:
+    import sqlite3
+
+    if isinstance(error, sqlite3.Error):
+        return True
+    try:
+        import psycopg
+
+        return isinstance(error, psycopg.Error)
+    except ImportError:
+        return False
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, error: Exception):
+    # DB 장애면 날것의 500 대신 "잠시 후 다시" 안내를 돌려준다 (QA)
+    if _is_db_error(error):
+        logger.error("DB 오류로 요청 실패: %s %s (%s)", request.method, request.url.path, type(error).__name__)
+        return JSONResponse(status_code=503, content={"detail": "저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."})
+    logger.exception("처리하지 못한 오류: %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "서버 오류가 발생했습니다."})
+
+
+def _llm_status() -> dict:
+    """LLM 환경변수가 설정됐는지만 알려 준다 (값은 절대 내보내지 않는다).
+
+    Render 대시보드에 접근할 수 없는 팀원도 '설명이 template으로 나오는 게 키가 없어서인지' 확인할 수 있다.
+    """
+    def configured(prefix: str) -> bool:
+        return bool(os.environ.get(f"{prefix}_AUTH_TOKEN") or os.environ.get(f"{prefix}_API_KEY"))
+
+    return {
+        "claude": {"configured": configured("ANTHROPIC"), "model": rag.CLAUDE_MODEL,
+                   "loaded": bool((rag._state or {}).get("client"))},
+        "followup": {"configured": configured("FOLLOWUP_OPENAI"),
+                     "model": os.environ.get("FOLLOWUP_OPENAI_MODEL") or followup.DEFAULT_FOLLOWUP_MODEL or None},
+        "report": {"configured": configured("REPORT_OPENAI"),
+                   "model": os.environ.get("REPORT_OPENAI_MODEL") or report.DEFAULT_REPORT_MODEL or None},
+        "database": db.describe().split(" ")[0],
+        "cors_origins": [o for o in (os.environ.get("CORS_ORIGINS") or "http://localhost:5173").split(",") if o],
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 def health():
-    # 배포 환경에서 어떤 모델·scikit-learn 버전이 돌고 있는지 Render 로그 없이도 확인할 수 있게 한다
-    return HealthResponse(status="ok", model=_model_info() or None)
+    # 배포 환경에서 어떤 모델·라이브러리 버전과 LLM 설정으로 돌고 있는지 Render 로그 없이도 확인할 수 있게 한다
+    return HealthResponse(status="ok", model=_model_info() or None, llm=_llm_status())
 
 
 def _client_key(client_id: uuid.UUID | None) -> str | None:
@@ -112,7 +181,10 @@ def _client_key(client_id: uuid.UUID | None) -> str | None:
 def create_client():
     return ClientResponse(client_id=str(uuid.uuid4()))
 
-_background = ThreadPoolExecutor(max_workers=4)
+_background = ThreadPoolExecutor(max_workers=8)
+# 평판 조회(외부 서비스)를 기다리는 최대 시간. 넘으면 평판 없이 결과를 돌려준다.
+# 예전 10초는 외부 서비스가 멈추면 분석마다 10초씩 늦어졌다 (QA: 10.5초)
+REPUTATION_WAIT = float(os.environ.get("REPUTATION_WAIT_SECONDS") or 4)
 
 
 @app.post("/api/v1/analyses", response_model=AnalysisResponse)
@@ -137,7 +209,7 @@ def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = He
         detection_result = Detections()
     if reputation_job is not None:
         try:
-            detection_result.reputation = reputation.to_detection(reputation_job.result(timeout=10))
+            detection_result.reputation = reputation.to_detection(reputation_job.result(timeout=REPUTATION_WAIT))
         except Exception:
             logger.exception("평판 신호 조회 실패: %s", request.url)
 
@@ -183,17 +255,16 @@ def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = He
         model=model_result,
     )
 
+    owner_row = None
+    if request.owner_name and request.owner_secret:
+        owner_row = (result.owner_name, owner.hash_secret(request.owner_secret), owner.hash_name(request.owner_name))
     try:
-        db.save_analysis(result, _client_key(x_client_id))
-        if request.owner_name or request.owner_secret:
-            db.save_owner(
-                result.id,
-                result.owner_name,
-                owner.hash_secret(request.owner_secret) if request.owner_secret else None,
-                owner.hash_name(request.owner_name) if request.owner_name else None,
-            )
+        db.save_analysis(result, _client_key(x_client_id), owner_row)
     except Exception:
-        logger.exception("분석 기록 저장 실패: %s", request.url)
+        # DB 장애에도 분석 결과는 돌려준다. 다만 저장되지 않은 결과라는 것을 알려,
+        # 프론트가 공유·공개 전환·리포트 버튼을 숨기게 한다 (QA: 저장 안 된 id로 요청하면 전부 404)
+        logger.exception("분석 기록 저장 실패 (분석 id %s)", result.id)
+        result.saved = False
     result.viewer = "owner"
     logger.info("분석 완료: %.2f초, 판정 %s, 설명 %s", time.perf_counter() - started, result.verdict, ai_analysis.written_by)
     return result
@@ -295,6 +366,17 @@ def read_shared(token: str):
 
 
 _llm_clients: dict = {}
+_report_locks: dict[str, threading.Lock] = {}
+_report_locks_guard = threading.Lock()
+
+
+def _report_lock(analysis_id: str) -> threading.Lock:
+    with _report_locks_guard:
+        if len(_report_locks) > 1000:  # 오래된 잠금 정리 (사용 중이 아닌 것만)
+            for key in [k for k, v in _report_locks.items() if not v.locked()]:
+                _report_locks.pop(key, None)
+        return _report_locks.setdefault(analysis_id, threading.Lock())
+
 
 
 def _followup_client():
@@ -327,15 +409,20 @@ def _load_report(analysis_id: str, client_key: str | None, share: str | None = N
     if cached is not None:
         return cached
 
-    research = followup.research(analysis, client=_followup_client())
-    result = report.generate_report(
-        analysis, research, client=_report_client(), analyzed_at=analyzed_at
-    )
-
-    try:
-        db.save_report(result)
-    except Exception:
-        logger.exception("리포트 저장 실패: %s", analysis_id)
+    # 같은 분석의 리포트를 동시에 요청하면 앞 요청이 만드는 동안 기다렸다가 저장본을 받는다.
+    # 예전에는 DB 중복 저장은 없었지만 LLM이 요청 수만큼 실행됐다 (QA: 3번 동시 요청 → 3번 호출)
+    with _report_lock(analysis_id):
+        cached = db.get_report(analysis_id)
+        if cached is not None:
+            return cached
+        research = followup.research(analysis, client=_followup_client())
+        result = report.generate_report(
+            analysis, research, client=_report_client(), analyzed_at=analyzed_at
+        )
+        try:
+            db.save_report(result)
+        except Exception:
+            logger.exception("리포트 저장 실패: %s", analysis_id)
     return result
 
 

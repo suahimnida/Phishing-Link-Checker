@@ -71,6 +71,7 @@ def test_similar_without_rag_returns_empty(monkeypatch):
 
 
 def test_load_rag_without_metadata(tmp_path, monkeypatch):
+    monkeypatch.setattr(rag, "_state", None)  # 다른 테스트가 서버를 띄우며 RAG를 이미 불러왔을 수 있다
     monkeypatch.setenv("RAG_INDEX_DIR", str(tmp_path))
     assert rag.load_rag() is False
     assert rag._state is None

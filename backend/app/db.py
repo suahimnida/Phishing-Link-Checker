@@ -104,6 +104,17 @@ def init_db() -> None:
         if "name_hash" not in columns:
             conn.execute("ALTER TABLE owners ADD COLUMN name_hash TEXT")
 
+        # 본인 확인 실패 횟수. 예전에는 서버 메모리에만 있어 재시작하면 잠금이 풀렸다 (QA)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS owner_failures (
+                analysis_id TEXT PRIMARY KEY,
+                count       INTEGER NOT NULL,
+                first_at    DOUBLE PRECISION NOT NULL
+            )
+            """
+        )
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS shares (
@@ -115,8 +126,11 @@ def init_db() -> None:
         )
 
 
-def save_analysis(result: AnalysisResponse, client_id: str | None) -> None:
+def save_analysis(result: AnalysisResponse, client_id: str | None, owner: tuple | None = None) -> None:
+    """분석 결과와 본인 확인 정보를 한 트랜잭션으로 저장한다 (둘 중 하나만 저장되는 일이 없게)."""
     with _connect() as (conn, p):
+        if owner is not None:
+            masked_name, secret_hash, name_hash = owner
         conn.execute(
             f"""
             INSERT INTO analyses (id, url, verdict, created_at, client_id, is_public, result_json)
@@ -132,6 +146,11 @@ def save_analysis(result: AnalysisResponse, client_id: str | None) -> None:
                 result.model_dump_json(exclude=VIEW_ONLY_FIELDS),
             ),
         )
+        if owner is not None:
+            conn.execute(
+                f"INSERT INTO owners (analysis_id, masked_name, secret_hash, name_hash) VALUES ({p}, {p}, {p}, {p})",
+                (result.id, masked_name, secret_hash, name_hash),
+            )
 
 
 def get_analysis(analysis_id: str, client_id: str | None) -> AnalysisResponse | None:
@@ -145,7 +164,7 @@ def get_analysis(analysis_id: str, client_id: str | None) -> AnalysisResponse | 
         return None
     return AnalysisResponse.model_validate_json(row["result_json"])
 
-VIEW_ONLY_FIELDS = {"viewer", "share_token"}
+VIEW_ONLY_FIELDS = {"viewer", "share_token", "saved"}
 
 
 def get_analysis_access(analysis_id: str, client_id: str | None):
@@ -196,16 +215,17 @@ def get_share_token(analysis_id: str) -> str | None:
 
 
 def create_share(analysis_id: str) -> str:
-    existing = get_share_token(analysis_id)
-    if existing:
-        return existing
+    # 이미 있으면 그 토큰을 돌려준다. '조회 후 INSERT'로 나눠 하면 동시 요청이 함께 INSERT하다
+    # PostgreSQL에서 UNIQUE 위반(500)이 났다 (QA: 5번 동시 요청 중 4번 실패) → ON CONFLICT로 한 번에 처리
     token = secrets.token_urlsafe(16)
     with _connect() as (conn, p):
         conn.execute(
-            f"INSERT INTO shares (token, analysis_id, created_at) VALUES ({p}, {p}, {p})",
+            f"INSERT INTO shares (token, analysis_id, created_at) VALUES ({p}, {p}, {p}) "
+            "ON CONFLICT (analysis_id) DO NOTHING",
             (token, analysis_id, datetime.now(timezone.utc).isoformat()),
         )
-    return token
+        row = conn.execute(f"SELECT token FROM shares WHERE analysis_id = {p}", (analysis_id,)).fetchone()
+    return row["token"]
 
 
 def delete_share(analysis_id: str) -> None:
@@ -304,6 +324,33 @@ def get_owner(analysis_id: str) -> dict | None:
 
 def delete_analysis(analysis_id: str) -> None:
     with _connect() as (conn, p):
-        for table, column in (("reports", "analysis_id"), ("shares", "analysis_id"),
-                              ("owners", "analysis_id"), ("analyses", "id")):
+        for table, column in (("reports", "analysis_id"), ("shares", "analysis_id"), ("owners", "analysis_id"),
+                              ("owner_failures", "analysis_id"), ("analyses", "id")):
             conn.execute(f"DELETE FROM {table} WHERE {column} = {p}", (analysis_id,))
+
+
+# ---------- 본인 확인 실패 기록 ----------
+
+def get_failures(analysis_id: str) -> tuple[int, float] | None:
+    with _connect() as (conn, p):
+        row = conn.execute(
+            f"SELECT count, first_at FROM owner_failures WHERE analysis_id = {p}", (analysis_id,)
+        ).fetchone()
+    return (int(row["count"]), float(row["first_at"])) if row else None
+
+
+def record_failure(analysis_id: str, now: float, window: float) -> None:
+    """실패를 1회 더한다. 첫 실패로부터 window초가 지났으면 1회부터 다시 센다."""
+    with _connect() as (conn, p):
+        conn.execute(
+            f"INSERT INTO owner_failures (analysis_id, count, first_at) VALUES ({p}, 1, {p}) "
+            f"ON CONFLICT (analysis_id) DO UPDATE SET "
+            f"count = CASE WHEN {p} - owner_failures.first_at > {p} THEN 1 ELSE owner_failures.count + 1 END, "
+            f"first_at = CASE WHEN {p} - owner_failures.first_at > {p} THEN {p} ELSE owner_failures.first_at END",
+            (analysis_id, now, now, window, now, window, now),
+        )
+
+
+def clear_failures(analysis_id: str) -> None:
+    with _connect() as (conn, p):
+        conn.execute(f"DELETE FROM owner_failures WHERE analysis_id = {p}", (analysis_id,))

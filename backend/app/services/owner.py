@@ -2,7 +2,6 @@ import hashlib
 import hmac
 import re
 import secrets
-import threading
 import time
 
 SECRET_PATTERN = re.compile(r"^[A-Za-z0-9]{8,12}$")
@@ -11,8 +10,6 @@ ITERATIONS = 200_000
 MAX_FAILURES = 5
 LOCK_SECONDS = 15 * 60
 
-_failures: dict = {} 
-_lock = threading.Lock()
 
 
 def mask_name(name: str) -> str:
@@ -66,20 +63,26 @@ def verify_name(name: str, stored_hash: str | None, masked: str | None) -> bool:
 
 
 def locked(analysis_id: str) -> bool:
-    with _lock:
-        count, first = _failures.get(analysis_id, (0, 0.0))
-        if count and time.time() - first > LOCK_SECONDS:
-            _failures.pop(analysis_id, None)
-            return False
-        return count >= MAX_FAILURES
+    """5번 틀린 뒤 첫 실패로부터 15분 동안 잠근다. 실패 기록은 DB에 있어 서버를 재시작해도 유지된다."""
+    from app import db
+
+    row = db.get_failures(analysis_id)
+    if row is None:
+        return False
+    count, first = row
+    if time.time() - first > LOCK_SECONDS:
+        db.clear_failures(analysis_id)
+        return False
+    return count >= MAX_FAILURES
 
 
 def record_failure(analysis_id: str) -> None:
-    with _lock:
-        count, first = _failures.get(analysis_id, (0, time.time()))
-        _failures[analysis_id] = (count + 1, first)
+    from app import db
+
+    db.record_failure(analysis_id, time.time(), LOCK_SECONDS)
 
 
 def clear_failures(analysis_id: str) -> None:
-    with _lock:
-        _failures.pop(analysis_id, None)
+    from app import db
+
+    db.clear_failures(analysis_id)

@@ -31,7 +31,7 @@ def temp_db(tmp_path, monkeypatch):
         monkeypatch.setenv("DATABASE_URL", test_pg)
         db.init_db()
         with db._connect() as (conn, _):
-            conn.execute("TRUNCATE analyses, reports")
+            conn.execute("TRUNCATE analyses, reports, shares, owners, owner_failures")
     else:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
