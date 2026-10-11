@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ValidationError
@@ -51,6 +52,14 @@ class OpenAIJsonClient:
         logger.info("%s 모델: %s (%s)", name, model, base_url or "api.openai.com")
         return cls(name, model, OpenAI(**client_kwargs))
 
+    def _log_usage(self, completion, started: float) -> None:
+        usage = getattr(completion, "usage", None)
+        logger.info(
+            "%s 호출: %s, %.2f초, 입력 %s토큰, 출력 %s토큰",
+            self.name, self.model, time.perf_counter() - started,
+            getattr(usage, "prompt_tokens", "?"), getattr(usage, "completion_tokens", "?"),
+        )
+
     def ask(self, system: str, user: str, schema: type[BaseModel]) -> BaseModel:
         if self.structured_supported:
             try:
@@ -66,11 +75,13 @@ class OpenAIJsonClient:
         return self._ask_plain(system, user, schema)
 
     def _ask_structured(self, system: str, user: str, schema: type[BaseModel]) -> BaseModel:
+        started = time.perf_counter()
         completion = self.client.chat.completions.parse(
             model=self.model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             response_format=schema,
         )
+        self._log_usage(completion, started)
         message = completion.choices[0].message
         if getattr(message, "refusal", None):
             raise RuntimeError(f"모델이 응답을 거절했습니다: {message.refusal}")
@@ -84,10 +95,12 @@ class OpenAIJsonClient:
             "다른 말이나 코드블록 표시는 쓰지 마세요.\n"
             + json.dumps(schema.model_json_schema(), ensure_ascii=False)
         )
+        started = time.perf_counter()
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "system", "content": system + format_rule}, {"role": "user", "content": user}],
         )
+        self._log_usage(completion, started)
         text = completion.choices[0].message.content or ""
         return parse_json_reply(text, schema)
 

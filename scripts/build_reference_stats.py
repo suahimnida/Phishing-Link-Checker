@@ -9,7 +9,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend" / "ml_integration"))
 
-import url_explain  # noqa: E402
+import url_explain 
 
 TRAIN = ROOT / "data" / "train_v2.csv"
 OUT = ROOT / "backend" / "resources" / "reference" / "url_stats.json"

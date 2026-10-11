@@ -9,8 +9,6 @@ FAKE_CASES = [
 ]
 
 
-# ---- Claude: 근거[E]와 가이드[G]로 출처 있는 설명 쓰기 (판정하지 않는다) ----
-
 EVIDENCE = [
     {"id": "E1", "source": "ML 모델", "text": "위험 점수는 99점입니다.", "used_in_verdict": True},
     {"id": "E2", "source": "탐지 결과 · URL 구조", "text": "도메인에 로그인 단어가 있습니다.", "used_in_verdict": False},
@@ -51,15 +49,15 @@ def test_compose_returns_cited_explanation(with_claude):
     "bad",
     [
         "출처 없이 위험하다고만 씁니다.",
-        "위험합니다 [E9].",  # 없는 근거 번호
+        "위험합니다 [E9].", 
         "위험합니다 [E1]. 출처 없는 문장입니다.",
-        "118로 전화하세요 [G1].",  # 전화번호는 서버가 보여 준다
+        "118로 전화하세요 [G1].",  
         "https://evil.example 로 가지 마세요 [E1].",
     ],
 )
 def test_compose_rejects_unsourced_text(with_claude, bad):
     with_claude(bad)
-    assert rag.compose(EVIDENCE, GUIDES) is None  # 호출한 쪽에서 템플릿으로 대신한다
+    assert rag.compose(EVIDENCE, GUIDES) is None 
 
 
 def test_compose_without_claude_returns_none(monkeypatch):
@@ -97,8 +95,20 @@ def test_phishing_url_finds_phishing_cases(real_rag):
     assert labels_of("http://m.login.secure.naver-account-verify-center.xyz/update?id=1029") == [1] * 5
 
 
-def test_official_brand_homepage_finds_normal_cases(real_rag):
-    assert labels_of("https://www.naver.com") == [0, 0, 0, 0, 0]
+def test_cases_are_balanced_and_not_homepage_biased(real_rag):
+    # 사례 목록은 v2 학습 데이터에서 라벨별로 같은 수, 경로 있는/없는 URL 반반 (scripts/build_similar_cases.py)
+    meta = rag._state["metadata"]
+    assert len(meta) == 5000 and int(meta["label"].sum()) == 2500
+    legit = meta[meta["label"] == 0]["url"]
+    assert legit.str.startswith("https://www.").mean() < 0.5
+
+
+def test_normal_urls_with_path_are_not_all_phishing_cases(real_rag):
+    # 기존 데이터에서는 경로 있는 정상 URL의 유사 사례가 거의 전부 피싱이었다 (QA)
+    urls = ["https://myschool.ac.kr/notice/view?id=12", "https://news.daum.net/article/123",
+            "https://www.youtube.com/watch?v=abc", "https://github.com/suahimnida/TEST"]
+    labels = [l for u in urls for l in labels_of(u)]
+    assert sum(labels) <= len(labels) * 0.6
 
 
 def test_similarity_is_sorted_and_in_range(real_rag):

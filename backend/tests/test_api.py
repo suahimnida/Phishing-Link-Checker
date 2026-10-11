@@ -12,7 +12,10 @@ client = TestClient(app)
 def test_health():
     res = client.get("/health")
     assert res.status_code == 200
-    assert res.json() == {"status": "ok"}
+    body = res.json()
+    assert body["status"] == "ok"
+    assert body["model"]["model"] == "v2"
+    assert body["model"]["sklearn"] == body["model"]["trained_sklearn"]
 
 
 def test_create_analysis_returns_stub(monkeypatch):
@@ -27,9 +30,8 @@ def test_create_analysis_returns_stub(monkeypatch):
     for key in ["verdict", "confidence", "risk_score", "risk_level"]:
         assert body[key] is None
     assert set(body["detections"]) == {"url", "url_stats", "domain", "reputation"}
-    assert body["detections"]["reputation"] is None  # 테스트에서는 외부 조회를 끈다
+    assert body["detections"]["reputation"] is None  
     assert body["detections"]["url"]["status"] == "normal"
-    # 판정이 없어도 예방 가이드를 찾아 템플릿 설명을 만든다
     assert body["ai_analysis"]["written_by"] == "template"
     assert body["ai_analysis"]["guides"][0]["key"] == "official_path"
     assert body["extracted_features"] == {}
@@ -68,7 +70,6 @@ def test_blacklist_match_skips_rag_and_model(monkeypatch):
     assert body["risk_score"] == 100.0
     assert body["risk_level"] == "danger"
     assert body["model"]["status"] == "not_ready"
-    # 블랙리스트 근거와 신고 가이드로 템플릿 설명을 만든다
     assert body["ai_analysis"]["written_by"] == "template"
     assert body["ai_analysis"]["evidence"][0]["source"] == "KISA 블랙리스트"
 
@@ -92,7 +93,9 @@ def test_ml_rag_llm_roles(monkeypatch):
     body = client.post("/api/v1/analyses", json={"url": "http://secure-login-verify.tk/account"}).json()
     ai = body["ai_analysis"]
     assert ai["written_by"] == rag.CLAUDE_MODEL and ai["summary"].endswith("[G1].")
-    assert ai["evidence"][0]["source"] == "ML 모델" and ai["evidence"][0]["id"] == "E1"
+    # 첫 근거는 최종 판정, 다음이 ML 점수
+    assert ai["evidence"][0]["source"] == "최종 판정" and ai["evidence"][0]["id"] == "E1"
+    assert ai["evidence"][1]["source"] == "ML 모델"
     assert {g["key"] for g in ai["guides"]} & {"official_path", "report_site", "account_protect"}
     assert all(g["url"].startswith("https://") for g in ai["guides"])
     assert seen["evidence"] == ai["evidence"] and seen["guides"] == ai["guides"]
@@ -156,7 +159,6 @@ def test_anyone_can_read_public_result():
 
     res = client.get(f"/api/v1/analyses/{created['id']}")
     assert res.status_code == 200
-    # 만든 사람에게는 owner, 다른 사람에게는 public으로 보이는 것만 다르다
     assert res.json() == {**created, "viewer": "public"}
 
 

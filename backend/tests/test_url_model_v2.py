@@ -33,7 +33,7 @@ def test_calibrate_maps_thresholds_to_service_scale():
     assert uf.calibrate(80, 50, 80) == 60
     assert uf.calibrate(100, 50, 80) == 100
     scores = [uf.calibrate(v, 50, 80) for v in range(0, 101, 5)]
-    assert scores == sorted(scores)  # 순서 유지
+    assert scores == sorted(scores)
 
 
 def test_v2_model_is_used_and_scores_in_range():
@@ -51,7 +51,7 @@ def test_v2_model_is_used_and_scores_in_range():
         ("https://nid.naver.com/nidlogin.login?mode=form", True),
         ("https://github.com/suahimnida/TEST", True),
         ("https://naver.com.evil.xyz/login", False),
-        ("https://sites.google.com/view/fake-login", False),  # 누구나 페이지를 올릴 수 있는 곳
+        ("https://sites.google.com/view/fake-login", False),
         ("https://docs.google.com/forms/d/e/abc/viewform", False),
         ("https://my-app.github.io", False),
         ("https://example-shop.blogspot.com", False),

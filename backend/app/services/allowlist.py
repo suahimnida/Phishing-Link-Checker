@@ -3,18 +3,18 @@ import sys
 from pathlib import Path
 
 from app.schemas import AllowlistResult
+from app.services.shorteners import is_shortener_host
 
 _ML_DIR = Path(__file__).resolve().parents[2] / "ml_integration"
 if str(_ML_DIR) not in sys.path:
     sys.path.append(str(_ML_DIR))
 
-from url_features import registered_domain, split_url  # noqa: E402
+from url_features import registered_domain, split_url 
 
 logger = logging.getLogger(__name__)
 
 _PATH = Path(__file__).resolve().parents[2] / "resources" / "allowlist" / "domains.txt"
 
-# 이 도메인 아래는 사용자가 만든 페이지라서 허용하지 않는다 (호스트 끝부분이 같으면 제외)
 USER_CONTENT = (
     "blogspot.com", "blogger.com", "weebly.com", "wixsite.com", "wordpress.com", "github.io",
     "githubusercontent.com", "googleusercontent.com", "sites.google.com", "docs.google.com",
@@ -45,9 +45,14 @@ def _is_user_content(host: str) -> bool:
     return any(host == s or host.endswith("." + s) for s in USER_CONTENT)
 
 
+def domains() -> set:
+    return _load()
+
+
 def check(url: str) -> AllowlistResult:
     host = split_url(url)["host"].lower().strip(".")
-    if not host or _is_user_content(host):
+    # 단축 URL은 목적지가 가려져 있어 공식 도메인으로 보지 않는다
+    if not host or _is_user_content(host) or is_shortener_host(host):
         return AllowlistResult()
     domain = registered_domain(host)
     if domain in _load():

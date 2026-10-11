@@ -84,7 +84,7 @@ def init_db() -> None:
             )
             """
         )
-        # 분석 요청자: 가린 성명과 식별 암호의 해시만 저장한다 (원문 저장 안 함)
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS owners (
@@ -94,7 +94,7 @@ def init_db() -> None:
             )
             """
         )
-        # 삭제할 때 성명을 확인하려고 성명 해시 칸을 추가한다. 이미 만들어진 DB에도 서버 시작 때 자동으로 추가된다
+
         columns = (
             {r["name"] for r in conn.execute("PRAGMA table_info(owners)").fetchall()}
             if not _database_url()
@@ -103,7 +103,7 @@ def init_db() -> None:
         )
         if "name_hash" not in columns:
             conn.execute("ALTER TABLE owners ADD COLUMN name_hash TEXT")
-        # 비공개 결과의 공유 링크. 분석 1건당 링크 1개, 공유를 중지하면 행을 지운다
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS shares (
@@ -145,13 +145,10 @@ def get_analysis(analysis_id: str, client_id: str | None) -> AnalysisResponse | 
         return None
     return AnalysisResponse.model_validate_json(row["result_json"])
 
-
-# 요청한 사람에 따라 달라지는 값이라 저장하지 않는다
 VIEW_ONLY_FIELDS = {"viewer", "share_token"}
 
 
 def get_analysis_access(analysis_id: str, client_id: str | None):
-    """공개 결과이거나 본인 결과이면 (분석 결과, 저장 시각, 본인 여부)를 돌려준다. 아니면 None."""
     with _connect() as (conn, p):
         row = conn.execute(
             f"SELECT result_json, created_at, client_id FROM analyses "
@@ -165,7 +162,6 @@ def get_analysis_access(analysis_id: str, client_id: str | None):
 
 
 def set_visibility(analysis_id: str, client_id: str | None, is_public: bool) -> AnalysisResponse | None:
-    """본인 결과의 공개 여부를 바꾼다. 본인 결과가 아니면 None."""
     if client_id is None:
         return None
     with _connect() as (conn, p):
@@ -200,7 +196,6 @@ def get_share_token(analysis_id: str) -> str | None:
 
 
 def create_share(analysis_id: str) -> str:
-    """공유 링크 토큰을 만든다. 이미 있으면 같은 토큰을 돌려준다. 토큰은 추측할 수 없는 무작위 문자열이다."""
     existing = get_share_token(analysis_id)
     if existing:
         return existing
@@ -219,7 +214,6 @@ def delete_share(analysis_id: str) -> None:
 
 
 def get_shared(token: str):
-    """공유 링크로 연 결과. (분석 결과, 저장 시각) 또는 None (없거나 공유를 중지한 링크)."""
     with _connect() as (conn, p):
         row = conn.execute(
             f"SELECT a.result_json, a.created_at, a.id FROM shares s JOIN analyses a ON a.id = s.analysis_id "
@@ -299,8 +293,6 @@ def save_owner(analysis_id: str, masked_name: str | None, secret_hash: str | Non
 
 
 def get_owner(analysis_id: str) -> dict | None:
-    """공개 결과의 요청자 확인 정보 (가린 성명, 성명 해시, 식별 암호 해시).
-    공개가 아니거나 식별 암호가 없으면 None (비공개 결과 삭제는 아직 지원하지 않음)."""
     with _connect() as (conn, p):
         row = conn.execute(
             f"SELECT o.masked_name, o.name_hash, o.secret_hash FROM owners o JOIN analyses a ON a.id = o.analysis_id "
@@ -311,7 +303,6 @@ def get_owner(analysis_id: str) -> dict | None:
 
 
 def delete_analysis(analysis_id: str) -> None:
-    """분석 결과와 연결된 리포트, 공유 링크, 요청자 정보를 함께 지운다."""
     with _connect() as (conn, p):
         for table, column in (("reports", "analysis_id"), ("shares", "analysis_id"),
                               ("owners", "analysis_id"), ("analyses", "id")):

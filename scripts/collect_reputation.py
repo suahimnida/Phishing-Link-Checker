@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "backend" / "ml_integration"))
 
-from app.services import reputation  # noqa: E402
-from url_features import registered_domain, split_url  # noqa: E402
+from app.services import reputation
+from url_features import registered_domain, split_url
 
 OUT = ROOT / "evaluation" / "reputation"
 LOG = OUT / "log.csv"
@@ -64,7 +64,7 @@ def collect(args):
                 "as_name": hosting.get("as_name"), "country": hosting.get("country"),
             })
             count += 1
-            time.sleep(args.delay)  # 외부 서비스 요청 제한을 지키기 위해 천천히 조회
+            time.sleep(args.delay)
         print(f"{'피싱' if label else '정상'}: {count}개 도메인 조회")
 
     new = not LOG.exists()

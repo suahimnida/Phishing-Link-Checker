@@ -1,5 +1,3 @@
-"""성명·사용자 식별 암호, 공개 분석의 가린 성명, 분석 결과 삭제 테스트."""
-
 import uuid
 
 import pytest
@@ -80,7 +78,7 @@ def test_verify_owner():
 def test_delete_removes_result_report_and_share():
     body = analyze()
     aid = body["id"]
-    client.post(f"/api/v1/analyses/{aid}/report")  # 공개 결과라 누구나 리포트를 만들 수 있다
+    client.post(f"/api/v1/analyses/{aid}/report") 
     res = client.post(f"/api/v1/analyses/{aid}/delete", json={"name": "김수아", "secret": SECRET, "confirm_text": CONFIRM})
     assert res.json() == {"deleted": True}
     assert client.get(f"/api/v1/analyses/{aid}").status_code == 404
@@ -93,14 +91,13 @@ def test_delete_needs_exact_confirm_text_and_secret():
     aid = body["id"]
     assert client.post(f"/api/v1/analyses/{aid}/delete", json={"name": "김수아", "secret": SECRET, "confirm_text": "삭제"}).status_code == 400
     assert client.post(f"/api/v1/analyses/{aid}/delete", json={"name": "김수아", "secret": "Wrong1234567", "confirm_text": CONFIRM}).status_code == 403
-    assert client.get(f"/api/v1/analyses/{aid}").status_code == 200  # 아직 남아 있다
+    assert client.get(f"/api/v1/analyses/{aid}").status_code == 200  
 
 
 def test_lock_after_repeated_wrong_secrets():
     aid = analyze()["id"]
     for _ in range(owner.MAX_FAILURES):
         assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": "김수아", "secret": "Wrong1234567"}).status_code == 403
-    # 잠긴 뒤에는 맞는 암호도 잠시 받지 않는다
     assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": "김수아", "secret": SECRET}).status_code == 429
 
 
@@ -122,7 +119,6 @@ def test_name_must_also_match():
     for wrong in ("김수희", "이수아", "김**", ""):
         res = client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": wrong, "secret": SECRET})
         assert res.status_code == 403
-    # 공백은 무시하고 비교한다
     assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": " 김 수아 ", "secret": SECRET}).status_code == 200
 
 
@@ -137,10 +133,10 @@ def test_name_is_stored_only_as_hash_and_mask():
 def test_older_owner_without_name_hash_uses_masked_name():
     """성명 해시 칸이 생기기 전에 저장된 공개 결과도 삭제할 수 있다."""
     aid = analyze(name=None, secret=None)["id"]
-    client.patch(f"/api/v1/analyses/{aid}/visibility", json={"is_public": True})  # 브라우저 ID 없어 실패해도 무관
+    client.patch(f"/api/v1/analyses/{aid}/visibility", json={"is_public": True}) 
     with db._connect() as (conn, p):
         conn.execute(f"UPDATE analyses SET is_public = 1 WHERE id = {p}", (aid,))
-    db.save_owner(aid, "김**", owner.hash_secret(SECRET))  # name_hash 없음
+    db.save_owner(aid, "김**", owner.hash_secret(SECRET)) 
     assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": "김민수", "secret": SECRET}).status_code == 200
     assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": "이민수", "secret": SECRET}).status_code == 403
 
@@ -156,6 +152,6 @@ def test_init_db_adds_name_hash_column_to_existing_table(tmp_path, monkeypatch):
         conn.execute("CREATE TABLE owners (analysis_id TEXT PRIMARY KEY, masked_name TEXT, secret_hash TEXT)")
     monkeypatch.setenv("DB_PATH", str(path))
     db.init_db()
-    db.init_db()  # 두 번 실행해도 오류가 없어야 한다
+    db.init_db()  
     with sqlite3.connect(path) as conn:
         assert "name_hash" in {r[1] for r in conn.execute("PRAGMA table_info(owners)")}

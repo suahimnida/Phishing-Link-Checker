@@ -62,19 +62,16 @@ def all_actions(result):
     return [a for g in result.action_groups for a in g.actions]
 
 
-# ---- 후속 조치 조사 (첫번째 키) ----
-
-
 def test_followup_uses_detections_similar_cases_and_ai_analysis(analysis):
     analysis.ai_analysis.summary = "AI 분석: 네이버 로그인 화면을 흉내 냅니다."
     llm = FakeLLM("followup-model", FOLLOWUP_REPLY)
     result = followup.research(analysis, client=llm)
 
     prompt = llm.prompts[0]
-    assert "탐지 결과" in prompt and "'naver' 브랜드명" in prompt  # 탐지 근거
+    assert "탐지 결과" in prompt and "'naver' 브랜드명" in prompt 
     assert "유사 사례" in prompt and analysis.similar_cases[0].url in prompt
     assert "AI 분석: 네이버 로그인 화면을 흉내 냅니다." in prompt
-    assert "118" not in prompt and "1332" not in prompt  # 연락처는 넘기지 않는다
+    assert "118" not in prompt and "1332" not in prompt 
 
     assert result.generated_by == "followup-model"
     assert result.priority_action_ids == ["do_not_visit", "change_password"]
@@ -82,7 +79,7 @@ def test_followup_uses_detections_similar_cases_and_ai_analysis(analysis):
 
 
 def test_followup_drops_actions_not_shown_for_verdict():
-    body, _ = analyze("https://www.google.com")  # 정상 판정: 예방 조치만
+    body, _ = analyze("https://www.google.com") 
     reply = {**FOLLOWUP_REPLY, "priority_action_ids": ["stop_payment", "verify_official"], "action_notes": []}
     result = followup.research(AnalysisResponse(**body), client=FakeLLM("m", reply))
     assert result.priority_action_ids == ["verify_official"]
@@ -100,16 +97,12 @@ def test_unknown_action_id_is_rejected_by_schema():
         FollowupLLM.model_validate({**FOLLOWUP_REPLY, "priority_action_ids": ["made_up_action"]})
 
 
-# ---- 리포트 작성 (두번째 키) ----
-
-
 def test_report_combines_everything(analysis):
     analysis.ai_analysis.summary = "AI 분석 설명입니다."
     research = followup.research(analysis, client=FakeLLM("followup-model", FOLLOWUP_REPLY))
     llm = FakeLLM("report-model", REPORT_REPLY)
     result = report.generate_report(analysis, research, client=llm)
 
-    # 리포트 LLM은 후속 조치 조사 결과까지 받는다
     assert "네이버 계정 정보를 노리는 피싱" in llm.prompts[0]
     assert "AI 분석 설명입니다." in llm.prompts[0]
 
@@ -135,14 +128,11 @@ def test_report_falls_back_when_llm_fails(analysis):
     research = followup.research(analysis, client=FakeLLM("followup-model", FOLLOWUP_REPLY))
     result = report.generate_report(analysis, research, client=FakeLLM("m", {"summary": " ", "risk_assessment": "x"}))
     assert result.generated_by == "template"
-    assert result.followup_by == "followup-model"  # 조사 결과는 그대로 쓴다
+    assert result.followup_by == "followup-model" 
 
 
 def test_report_schema_has_only_narrative_fields():
     assert set(ReportLLM.model_fields) == {"summary", "risk_assessment"}
-
-
-# ---- API ----
 
 
 @pytest.fixture
@@ -167,9 +157,8 @@ def test_report_is_created_only_once(fake_llms):
     headers = {"X-Client-Id": cid}
     first = client.post(f"/api/v1/analyses/{body['id']}/report", headers=headers).json()
     again = client.post(f"/api/v1/analyses/{body['id']}/report", headers=headers).json()
-    assert first["created_at"] == again["created_at"]  # 저장된 리포트 재사용
+    assert first["created_at"] == again["created_at"]  
 
-    # 예전의 다시 생성 요청(?regenerate=true)을 보내도 LLM을 다시 부르지 않는다
     forced = client.post(f"/api/v1/analyses/{body['id']}/report?regenerate=true", headers=headers).json()
     assert forced["created_at"] == first["created_at"]
     client.get(f"/api/v1/analyses/{body['id']}/report.pdf", headers=headers)

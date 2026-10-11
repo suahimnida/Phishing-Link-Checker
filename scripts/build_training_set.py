@@ -11,7 +11,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend" / "ml_integration"))
 
-from url_features import registered_domain, split_url  # noqa: E402
+from url_features import registered_domain, split_url 
 
 DATA = ROOT / "data"
 PHIUSIIL = DATA / "PhiUSIIL_Phishing_URL_Dataset.csv"
@@ -48,7 +48,7 @@ def load_public() -> pd.DataFrame:
 
 def load_phiusiil() -> pd.DataFrame:
     df = pd.read_csv(PHIUSIIL, usecols=["URL", "label"]).rename(columns={"URL": "url"})
-    df["label"] = 1 - df["label"]  # 원본 1=정상
+    df["label"] = 1 - df["label"] 
     df["source"] = "PhiUSIIL"
     return df
 
@@ -89,7 +89,6 @@ def main():
     df = df.drop_duplicates("url")
     conflict = df.groupby("url").label.nunique()
     df = df[~df.url.isin(conflict[conflict > 1].index)]
-    # 한 캠페인·한 사이트가 학습을 좌우하지 않도록 도메인당 건수를 제한한다
     df = pd.concat([cap_per_domain(df[df.label == 1], 5, args.seed), cap_per_domain(df[df.label == 0], 20, args.seed)])
 
     parts = []

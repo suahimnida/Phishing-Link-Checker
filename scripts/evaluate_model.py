@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ML = ROOT / "backend" / "ml_integration"
 sys.path.insert(0, str(ML))
 
-from preprocess import SUSPICIOUS_KEYWORDS, extract_features, safe_urlparse  # noqa: E402
+from preprocess import SUSPICIOUS_KEYWORDS, extract_features, safe_urlparse 
 
 EVAL = ROOT / "evaluation"
 RESULTS = EVAL / "results"
@@ -48,10 +48,11 @@ def load_model(version="v1"):
 
 def score(urls, model, columns) -> pd.DataFrame:
     feats = pd.DataFrame([extract_features(u) for u in urls])
-    if columns is None:  # v2: 원문 URL을 받는 파이프라인 + 기준점 보정
-        from url_features import calibrate
+    if columns is None:  
+        from url_features import calibrate, canonical_url
 
-        raw = model["model"].predict_proba(list(urls))[:, 1] * 100
+        # 서비스와 같은 입력(스킴·호스트 소문자)으로 평가한다
+        raw = model["model"].predict_proba([canonical_url(u) for u in urls])[:, 1] * 100
         t = model["report"]["thresholds"]
         feats["score"] = [calibrate(v, t["suspicious"], t["phishing"]) for v in raw]
     else:
@@ -128,7 +129,7 @@ def internal_eval(model, columns) -> dict:
     from sklearn.model_selection import train_test_split
 
     raw = pd.read_csv(ROOT / "data" / "PhiUSIIL_Phishing_URL_Dataset.csv", usecols=["URL", "label"])
-    raw["label"] = 1 - raw["label"]  # 원본 1=정상 → 모델 기준 1=피싱
+    raw["label"] = 1 - raw["label"] 
     _, test = train_test_split(raw, test_size=0.2, random_state=42, stratify=raw["label"])
     scored = score(test["URL"].tolist(), model, columns)
     y = test["label"].to_numpy()

@@ -40,6 +40,25 @@ def split_url(raw: str) -> dict:
     return {"raw": raw, "scheme": scheme, "netloc": netloc, "host": host, "path": path, "query": query}
 
 
+_HEAD = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)?([^/?#]*)")
+_ROOT_SLASH = re.compile(r"^((?:[a-z][a-z0-9+.-]*://)?[^/?#]+)/$")
+
+
+def canonical_url(raw: str) -> str:
+    """모델에 넣기 전에 스킴과 호스트를 소문자로 바꾸고, 홈페이지 끝의 '/' 하나를 지운다.
+
+    도메인은 대소문자를 구분하지 않지만, 문자 n-gram 모델은 대문자를 처음 보는 글자로 본다.
+    그래서 'HTTP://SECURE-LOGIN-KAKAO.XYZ/VERIFY'가 정상(28점)으로 나오는 우회가 있었다 (QA).
+    경로와 쿼리는 대소문자를 구분할 수 있으므로 그대로 둔다.
+    """
+    raw = str(raw).strip()
+    url = _HEAD.sub(lambda m: (m.group(1) or "").lower() + m.group(2).lower(), raw, count=1)
+    # 'https://도메인/'처럼 경로가 '/' 하나뿐이면 '/'가 없는 것과 같은 주소다.
+    # 학습 데이터의 홈페이지 URL은 대부분 끝에 '/'가 없어서, '/' 하나로 점수가 30~40점씩 흔들렸다 (QA).
+    m = _ROOT_SLASH.match(url)
+    return m.group(1) if m else url
+
+
 def strip_www(host: str) -> str:
     return host[4:] if host.lower().startswith("www.") else host
 
@@ -60,9 +79,6 @@ def entropy(text: str) -> float:
     counts = Counter(text)
     n = len(text)
     return -sum(c / n * math.log2(c / n) for c in counts.values())
-
-
-# ---- n-gram 입력 (텍스트) ----
 
 
 def text_raw(urls) -> list:
@@ -88,9 +104,6 @@ def text_path(urls) -> list:
         p = split_url(u)
         out.append(p["path"] + ("?" + p["query"] if p["query"] else ""))
     return out
-
-
-# ---- 구조 특징 (숫자) ----
 
 STRUCT_NAMES = [
     "host_len", "host_labels_extra", "host_digit_ratio", "host_hyphens", "is_ip", "has_punycode",

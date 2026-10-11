@@ -44,13 +44,8 @@ def guide_for_action(action_id: str) -> dict | None:
     return next((g for g in _load()["guides"] if action_id in g["actions"]), None)
 
 
-# ---------------------------------------------------------------------------
-# ① ML: 근거 목록
-# ---------------------------------------------------------------------------
-
-
 def build_evidence(*, verdict, risk_score, blacklist, allowlist, model, explanation, detections,
-                   similar_cases) -> list[dict]:
+                   similar_cases, shortener: bool = False, homograph=None) -> list[dict]:
     items = []
 
     def add(source, text, used):
@@ -58,7 +53,32 @@ def build_evidence(*, verdict, risk_score, blacklist, allowlist, model, explanat
 
     if blacklist.matched:
         add("KISA 블랙리스트", f"KISA 피싱 사이트 목록과 일치해 피싱으로 확정됐습니다 ({blacklist.source}).", True)
-    if model.status == "ready" and model.risk_score is not None:
+    elif verdict is not None and risk_score is not None:
+        # 첫 근거는 항상 최종 판정. 템플릿 설명의 첫 문장이 이 근거를 인용한다 (QA: 판정 문장이 ML 원점수를 인용하던 문제)
+        add("최종 판정", f"최종 위험도는 {risk_score:g}점으로 '{VERDICT_KO.get(verdict, verdict)}' 판정입니다.", True)
+
+    allowlisted = allowlist.matched and not blacklist.matched
+    shortened = shortener and not blacklist.matched
+    ml_ready = model.status == "ready" and model.risk_score is not None
+    ml_note = f"URL 문자 패턴 점수({model.risk_score:g}점)와 관계없이 " if ml_ready else ""
+
+    # 최종 판정을 ML 점수와 다르게 정한 이유를 판정 바로 다음 근거로 둔다.
+    # 이때는 ML 원점수를 따로 내세우지 않는다 (QA: 정상 25점인데 "ML 점수가 매우 높다"고 설명하던 문제)
+    if allowlisted:
+        add("공식 도메인 허용 목록", f"{allowlist.domain}은(는) 공식 도메인 목록에 있어, {ml_note}정상으로 판정했습니다.", True)
+    if shortened:
+        add("단축 URL", f"단축 URL이라 실제로 이동할 주소를 URL만으로 확인할 수 없어, {ml_note}'피싱 의심'으로 표시합니다.", True)
+    if homograph is not None and getattr(homograph, "matched", False) and not blacklist.matched:
+        if homograph.imitates:
+            add("동형 문자 도메인",
+                f"도메인 '{homograph.decoded}'은(는) 공식 도메인 {homograph.imitates}의 글자를 비슷하게 생긴 다른 "
+                "문자로 바꾼 사칭 주소입니다.", True)
+        elif homograph.mixed_script:
+            add("동형 문자 도메인",
+                f"도메인 '{homograph.decoded}'은(는) 한 이름 안에 서로 다른 문자 체계가 섞여 있어 다른 주소로 착각하게 만들 수 있습니다.",
+                True)
+
+    if ml_ready and not allowlisted and not shortened:
         add("ML 모델", f"URL 문자 패턴으로 계산한 위험 점수는 {model.risk_score:g}점입니다.", True)
         parts = sorted([p for p in ((explanation or {}).get("model") or {}).get("parts", [])
                         if p["contribution"] > 0.3 and p["text"]], key=lambda p: -p["contribution"])[:3]
@@ -66,16 +86,17 @@ def build_evidence(*, verdict, risk_score, blacklist, allowlist, model, explanat
             add("ML 모델 · 부분별 기여",
                 "점수를 가장 크게 올린 부분은 " + ", ".join(f"{p['part']} '{p['text']}'(+{p['contribution']:.2f})" for p in parts) + "입니다.",
                 True)
-    if allowlist.matched and not blacklist.matched:
-        add("공식 도메인 허용 목록", f"{allowlist.domain}은(는) 공식 도메인 목록에 있어 ML 점수만으로 피싱 판정을 내리지 않았습니다.", True)
 
     for key, title in (("url", "URL 구조"), ("domain", "도메인 분석"), ("url_stats", "URL 통계"), ("reputation", "평판 신호")):
         item = getattr(detections, key, None)
         if item and item.get("status") == "suspicious":
             for reason in item.get("reasons", [])[:2]:
+                if shortener and "단축 URL" in reason:
+                    continue
                 add(f"탐지 결과 · {title}", reason, False)
 
-    if similar_cases:
+    # 공식 도메인은 유사 사례를 근거로 쓰지 않는다 (정상 판정과 반대되는 인상을 주므로)
+    if similar_cases and not allowlisted:
         phishing = sum(1 for c in similar_cases if c.label == 1)
         add("유사 사례", f"특징이 가장 비슷한 과거 사례 {len(similar_cases)}건 중 피싱이 {phishing}건입니다.", False)
     return items[:10]
@@ -85,10 +106,14 @@ def evidence_tags(url: str, verdict: str | None, evidence: list[dict]) -> set:
     text = " ".join(e["text"] for e in evidence).lower()
     lower = url.lower()
     tags = set()
-    if verdict in ("phishing", "suspicious"):
-        tags.add("phishing_site")
-    else:
+    if verdict not in ("phishing", "suspicious"):
+        # 정상(또는 판정 불가)이면 예방 안내만 붙인다. 도메인에 'bank', 'login' 같은 단어가 있다고
+        # 지급정지·피해 대응 가이드를 붙이지 않는다 (QA: 정상인 kbstar.com에 '일괄 지급정지' 가이드)
         tags.add("prevention")
+        if "단축 url" in text:
+            tags.update({"shortener", "smishing"})
+        return tags
+    tags.add("phishing_site")
     if "브랜드" in text or "사칭" in text or "공식 도메인(" in text:
         tags.add("brand_impersonation")
     if any(w in lower for w in LOGIN_WORDS):
@@ -102,11 +127,6 @@ def evidence_tags(url: str, verdict: str | None, evidence: list[dict]) -> set:
     if lower.split("?")[0].endswith(DOWNLOAD_EXT) or "download" in lower:
         tags.update({"app_install", "file_download"})
     return tags
-
-
-# ---------------------------------------------------------------------------
-# ② RAG: 대응 가이드 검색
-# ---------------------------------------------------------------------------
 
 
 def retrieve(tags: set, evidence: list[dict], top_k: int = 4) -> list[dict]:
@@ -130,13 +150,15 @@ def retrieve(tags: set, evidence: list[dict], top_k: int = 4) -> list[dict]:
     return hits
 
 
-# ---------------------------------------------------------------------------
-# ③ LLM 설명 검사와 템플릿
-# ---------------------------------------------------------------------------
-
 _CITATION = re.compile(r"\[([EG]\d+)\]")
-# 한글이 바로 붙어도(예: "118로") 잡도록 단어 경계 대신 앞뒤에 다른 숫자가 없는지로 본다
 _FORBIDDEN = re.compile(r"https?://|www\.|(?<!\d)\d{2,4}-\d{3,4}-\d{4}(?!\d)|(?<![\d.])(?:112|118|1332)(?![\d.])")
+
+
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _numbers(text: str) -> set:
+    return set(_NUMBER.findall(_CITATION.sub(" ", text)))
 
 
 def check_citations(text: str, evidence: list[dict], guides: list[dict]) -> str:
@@ -152,10 +174,14 @@ def check_citations(text: str, evidence: list[dict], guides: list[dict]) -> str:
     unknown = set(cited) - valid
     if unknown:
         raise ValueError(f"없는 출처 번호를 썼습니다: {sorted(unknown)}")
-    # 문장 끝 마침표 뒤에 바로 오는 출처 표시([E1])는 앞 문장에 붙은 것으로 본다
     sentences = [s for s in re.split(r"(?<=[.!?])\s+(?!\[)", text) if s.strip()]
     if any(not _CITATION.search(s) for s in sentences):
         raise ValueError("출처 표시가 없는 문장이 있습니다")
+    # 숫자는 근거나 가이드에 있는 것만 쓸 수 있다 ("3일 전에 등록" 같은 지어낸 수치를 막는다)
+    allowed = _numbers(" ".join(e["text"] for e in evidence) + " " + " ".join(g["text"] for g in guides))
+    invented = _numbers(text) - allowed
+    if invented:
+        raise ValueError(f"근거에 없는 숫자를 썼습니다: {sorted(invented)}")
     return text
 
 
@@ -169,8 +195,11 @@ def template_explanation(verdict: str | None, evidence: list[dict], guides: list
     sentences = []
     if evidence:
         head = evidence[0]
-        sentences.append(cite(f"이 URL은 '{VERDICT_KO.get(verdict, '판정 불가')}'으로 판정됐습니다", head["id"]))
-        sentences.append(cite(head["text"], head["id"]))
+        if head["source"] in ("최종 판정", "KISA 블랙리스트"):
+            sentences.append(cite(head["text"], head["id"]))
+        else:
+            sentences.append(cite(f"이 URL은 '{VERDICT_KO.get(verdict, '판정 불가')}'(으)로 판정됐습니다", head["id"]))
+            sentences.append(cite(head["text"], head["id"]))
     for e in evidence[1:3]:
         sentences.append(cite(f"{e['source']}: {e['text']}", e["id"]))
     for g in guides[:2]:

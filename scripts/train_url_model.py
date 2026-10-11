@@ -20,8 +20,8 @@ ML = ROOT / "backend" / "ml_integration"
 sys.path.insert(0, str(ML))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import url_features as uf  # noqa: E402
-from evaluate_model import shortcut_rule  # noqa: E402
+import url_features as uf  
+from evaluate_model import shortcut_rule 
 
 DATA = ROOT / "data"
 EVAL = ROOT / "evaluation"
@@ -37,8 +37,6 @@ def ngrams(fn, max_features=200_000):
 
 
 def numeric(fn):
-    # 길이·개수에는 극단값이 많고(경로 길이 수천 자 등) 드문 0/1 특징은 표준화하면 값이 커져서
-    # 분류기가 수렴하지 못한다. log(1+x)로 줄인 뒤 0~1 범위로 맞춰 TF-IDF 값과 크기를 비슷하게 한다
     return Pipeline([
         ("values", FunctionTransformer(fn)),
         ("log", FunctionTransformer(np.log1p)),
@@ -67,7 +65,6 @@ def build(step: str) -> Pipeline:
 
 
 def slim(model: Pipeline) -> Pipeline:
-    """학습 중 버린 n-gram 목록(stop_words_)은 예측에 필요 없고 메모리를 크게 차지해서 지운다."""
     for _, step in model.named_steps["features"].transformer_list:
         tfidf = getattr(step, "named_steps", {}).get("tfidf")
         if tfidf is not None and hasattr(tfidf, "stop_words_"):
@@ -191,7 +188,6 @@ PHISHING_FPR, SUSPICIOUS_FPR = 0.02, 0.05
 
 
 def threshold_for_fpr(y, score, target) -> float:
-    """검증 세트 정상 URL의 오탐률이 target 이하가 되는 가장 낮은 점수"""
     legit = np.sort(score[y == 0])
     return float(np.round(legit[int(np.ceil(len(legit) * (1 - target))) - 1], 2))
 

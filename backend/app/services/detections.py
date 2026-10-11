@@ -51,10 +51,9 @@ def _result(reasons: list[str], notes: list[str]) -> dict:
     return {"status": status, "reasons": reasons, "notes": notes or [_SHORT_REASON[status]]}
 
 
-# 해킹당한 정상 사이트에 피싱 페이지를 숨길 때 자주 쓰는 폴더
 CMS_DIRS = ("/wp-content/", "/wp-includes/", "/wp-admin/", "/administrator/", "/sites/default/files/",
             "/.well-known/", "/cgi-bin/")
-# 워드프레스 관리 화면은 정상 사이트에도 로그인 단어가 있으므로 다른 브랜드 이름만 근거로 본다
+
 ADMIN_DIRS = ("/wp-admin/", "/administrator/")
 CREDENTIAL_WORDS = ("login", "signin", "sign-in", "logon", "verify", "verification", "account", "secure",
                     "update", "confirm", "password", "banking", "webscr", "wallet", "recovery", "unlock")
@@ -62,10 +61,9 @@ _EMBEDDED_DOMAIN = re.compile(r"/(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|
 
 
 def _path_patterns(path: str, registered: str) -> list[str]:
-    """접속 없이 경로만 보고 찾는 해킹 사이트 피싱 페이지 형태."""
     reasons = []
     lower = path.lower()
-    tokens = set(re.split(r"[^a-z0-9]+", lower))  # 'accounting'이 'account'로 잡히지 않도록 단어 단위로 비교
+    tokens = set(re.split(r"[^a-z0-9]+", lower)) 
     brands = [b for b, official in OFFICIAL_DOMAINS.items() if b in tokens and registered not in official]
     words = [w for w in CREDENTIAL_WORDS if w in tokens]
 

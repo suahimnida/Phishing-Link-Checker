@@ -12,12 +12,12 @@ from app.services.allowlist import _is_user_content
 from url_features import registered_domain, split_url
 
 logger = logging.getLogger(__name__)
-# 평판 조회 한 번에 요청 로그가 여러 줄 찍혀 배포 로그가 지저분해진다 (Claude·OpenAI 호출은 httpx2라 영향 없음)
+
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-TIMEOUT = 4.0  # 각 조회의 시간 제한 (초)
+TIMEOUT = 4.0 
 CACHE_SECONDS = 24 * 3600
-NEW_DOMAIN_DAYS = 30  # 이보다 최근에 등록·발급되면 의심 근거
+NEW_DOMAIN_DAYS = 30 
 YOUNG_DOMAIN_DAYS = 365
 
 RDAP_BOOTSTRAP = "https://data.iana.org/rdap/dns.json"
@@ -51,11 +51,6 @@ def _days_since(dt: datetime) -> int:
     return max((datetime.now(timezone.utc) - dt).days, 0)
 
 
-# ---------------------------------------------------------------------------
-# 도메인 등록일 (RDAP)
-# ---------------------------------------------------------------------------
-
-
 def _rdap_base(tld: str, client) -> str | None:
     if "services" not in _bootstrap:
         data = client.get(RDAP_BOOTSTRAP).json()
@@ -79,11 +74,6 @@ def rdap_lookup(domain: str, client) -> dict:
     return {"status": "ok", "created": created.date().isoformat(), "age_days": _days_since(created)}
 
 
-# ---------------------------------------------------------------------------
-# 인증서 첫 발급일 (CT 로그)
-# ---------------------------------------------------------------------------
-
-
 def ct_lookup(domain: str, client) -> dict:
     resp = client.get(CRT_SH, params={"q": domain, "output": "json"})
     resp.raise_for_status()
@@ -97,11 +87,6 @@ def ct_lookup(domain: str, client) -> dict:
             "count": len(certs), "lets_encrypt_only": all("Let's Encrypt" in i for i in issuers if i)}
 
 
-# ---------------------------------------------------------------------------
-# 호스팅 정보 (DNS → ASN)
-# ---------------------------------------------------------------------------
-
-
 def _doh(name: str, rtype: str, client) -> dict:
     resp = client.get(DOH, params={"name": name, "type": rtype}, headers={"accept": "application/dns-json"})
     resp.raise_for_status()
@@ -113,7 +98,7 @@ def hosting_lookup(host: str, client) -> dict:
         ip = str(ipaddress.ip_address(host))
     except ValueError:
         answer = _doh(host, "A", client)
-        if answer.get("Status") == 3:  # NXDOMAIN
+        if answer.get("Status") == 3: 
             return {"status": "nxdomain"}
         ips = [a["data"] for a in answer.get("Answer", []) if a.get("type") == 1]
         if not ips:
@@ -135,15 +120,10 @@ def hosting_lookup(host: str, client) -> dict:
     return {"status": "ok", "ip": ip, "asn": f"AS{asn}", "as_name": as_name, "country": country}
 
 
-# ---------------------------------------------------------------------------
-# 조회 묶음과 근거 문장
-# ---------------------------------------------------------------------------
-
-
 def _safe(fn, *args) -> dict:
     try:
         return fn(*args)
-    except Exception as error:  # 외부 서비스 장애는 "확인 불가"로 처리하고 분석은 계속한다
+    except Exception as error:  
         logger.info("평판 조회 실패 %s: %s", fn.__name__, type(error).__name__)
         return {"status": "error"}
 

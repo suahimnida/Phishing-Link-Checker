@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.services.detections import _registered_domain  # noqa: E402
+from app.services.detections import _registered_domain 
 
 DATA = ROOT / "data"
 EVAL = ROOT / "evaluation"

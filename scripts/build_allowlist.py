@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend" / "ml_integration"))
 
-from url_features import registered_domain  # noqa: E402
+from url_features import registered_domain 
 
 TOP_SITES = "https://registry.npmjs.org/top-sites/-/top-sites-1.1.229.tgz"
 OUT = ROOT / "backend" / "resources" / "allowlist" / "domains.txt"

@@ -8,7 +8,6 @@ import url_features as uf
 
 STATS_PATH = Path(__file__).resolve().parents[1] / "resources" / "reference" / "url_stats.json"
 
-# 화면에 보여 줄 참고 지표: (키, 이름, 단위)
 METRICS = [
     ("url_length", "URL 길이 (scheme 제외)", "자"),
     ("host_length", "도메인 길이", "자"),
@@ -28,11 +27,6 @@ _TEXT_FUNCS = {
     uf.text_host: "도메인",
     uf.text_path: "경로",
 }
-
-
-# ---------------------------------------------------------------------------
-# URL 부분 나누기
-# ---------------------------------------------------------------------------
 
 
 def segment_url(raw: str) -> list:
@@ -79,11 +73,6 @@ def segment_url(raw: str) -> list:
     return parts
 
 
-# ---------------------------------------------------------------------------
-# 모델 기여도
-# ---------------------------------------------------------------------------
-
-
 def _occurrences(text: str, gram: str) -> list:
     out, start = [], text.find(gram)
     while start >= 0:
@@ -107,7 +96,7 @@ def explain_model(model, url: str, top: int = 6) -> dict:
         weights = coef[offset:offset + width]
         offset += width
         tfidf = getattr(part, "named_steps", {}).get("tfidf")
-        if tfidf is None:  # 숫자 특징(구조 특징, 엔트로피)은 글자 위치가 없어 묶어서 보여 준다
+        if tfidf is None: 
             other[name] = float(np.asarray(values).ravel() @ weights)
             continue
         func = part.named_steps["text"].func
@@ -146,11 +135,6 @@ def explain_model(model, url: str, top: int = 6) -> dict:
         "top_risky": [{**g, "contribution": round(g["contribution"], 3)} for g in risky],
         "top_safe": [{**g, "contribution": round(g["contribution"], 3)} for g in safe],
     }
-
-
-# ---------------------------------------------------------------------------
-# 정상 데이터 대비 위치
-# ---------------------------------------------------------------------------
 
 
 def metric_values(url: str) -> dict:

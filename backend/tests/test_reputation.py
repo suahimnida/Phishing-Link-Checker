@@ -10,7 +10,7 @@ from app.main import app
 from app.services import reputation
 
 NOW = datetime.now(timezone.utc)
-DOMAINS = {  # 도메인: (등록일, 첫 인증서 발급일, DNS 상태)
+DOMAINS = {  
     "fresh-login.xyz": (NOW - timedelta(days=5), NOW - timedelta(days=3), "ok"),
     "naver.com": (datetime(1997, 9, 12, tzinfo=timezone.utc), datetime(2014, 1, 1, tzinfo=timezone.utc), "ok"),
     "gone-phish.top": (None, None, "nxdomain"),

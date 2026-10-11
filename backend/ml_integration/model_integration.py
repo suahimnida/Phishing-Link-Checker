@@ -46,10 +46,31 @@ def _load_v2():
     return _v2 or None
 
 
-def _predict_v2(v2: dict, url: str) -> dict:
-    from url_features import calibrate
+def model_info() -> dict:
+    """배포 환경에서 어떤 모델이 로드됐는지 확인하기 위한 정보 (/health와 시작 로그에 표시)."""
+    import hashlib
 
-    raw = float(v2["model"].predict_proba([url])[0][1]) * 100
+    import sklearn
+
+    info = {"sklearn": sklearn.__version__, "model": None, "sha256": None, "trained_at": None,
+            "trained_sklearn": None}
+    v2 = _load_v2()
+    if v2 is None:
+        _load_artifacts()
+        info["model"] = "v1" if _load_error is None else "not_ready"
+        return info
+    path = os.path.join(MODEL_DIR, "url_model_v2.joblib")
+    with open(path, "rb") as f:
+        info["sha256"] = hashlib.sha256(f.read()).hexdigest()[:12]
+    report = v2["report"]
+    info.update(model="v2", trained_at=report.get("trained_at"), trained_sklearn=report.get("sklearn_version"))
+    return info
+
+
+def _predict_v2(v2: dict, url: str) -> dict:
+    from url_features import calibrate, canonical_url
+
+    raw = float(v2["model"].predict_proba([canonical_url(url)])[0][1]) * 100
     t = v2["report"]["thresholds"]
     risk_score = round(calibrate(raw, t["suspicious"], t["phishing"]), 2)
     label = "phishing" if risk_score >= 60 else "normal"

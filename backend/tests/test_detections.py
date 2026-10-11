@@ -67,12 +67,12 @@ def test_compromised_site_path_patterns(url):
 @pytest.mark.parametrize(
     "url",
     [
-        "https://myblog.com/wp-login.php",  # 워드프레스 자체 관리자 로그인
+        "https://myblog.com/wp-login.php", 
         "https://myblog.com/wp-admin/",
         "https://myblog.com/wp-content/uploads/2024/photo.jpg",
-        "https://www.paypal.com/signin",  # 공식 도메인
-        "https://blog.example.com/review-of-paypal-fees",  # 로그인 단어 없음
-        "https://erpsoftwareblog.com/2010/08/microsoft-dynamics-gp-accounting-software/",  # accounting ≠ account
+        "https://www.paypal.com/signin",  
+        "https://blog.example.com/review-of-paypal-fees",  
+        "https://erpsoftwareblog.com/2010/08/microsoft-dynamics-gp-accounting-software/", 
     ],
 )
 def test_path_patterns_do_not_flag_normal_sites(url):

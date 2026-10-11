@@ -1,5 +1,3 @@
-"""공개/비공개와 '링크가 있는 사람은 볼 수 있음' 테스트."""
-
 import uuid
 
 from fastapi.testclient import TestClient
@@ -33,11 +31,10 @@ def test_share_link_opens_private_result_for_anyone():
     token = client.post(f"/api/v1/analyses/{body['id']}/share", headers=me).json()["token"]
     assert token and len(token) >= 20
 
-    shared = client.get(f"/api/v1/shared/{token}").json()  # 브라우저 ID 없이도 열린다
+    shared = client.get(f"/api/v1/shared/{token}").json()  
     assert shared["id"] == body["id"] and shared["viewer"] == "shared"
-    assert shared["share_token"] is None  # 토큰은 본인에게만 보낸다
+    assert shared["share_token"] is None 
     assert client.get(f"/api/v1/analyses/{body['id']}", headers=me).json()["share_token"] == token
-    # 같은 결과에 다시 만들면 같은 링크
     assert client.post(f"/api/v1/analyses/{body['id']}/share", headers=me).json()["token"] == token
 
 
@@ -55,7 +52,7 @@ def test_only_owner_can_share_or_change_visibility():
     body = analyze(me)
     assert client.post(f"/api/v1/analyses/{body['id']}/share", headers=other).status_code == 404
     assert client.delete(f"/api/v1/analyses/{body['id']}/share", headers=other).status_code == 404
-    assert client.post(f"/api/v1/analyses/{body['id']}/share").status_code == 404  # 브라우저 ID 없음
+    assert client.post(f"/api/v1/analyses/{body['id']}/share").status_code == 404
     res = client.patch(f"/api/v1/analyses/{body['id']}/visibility", json={"is_public": True}, headers=other)
     assert res.status_code == 404
 
@@ -90,7 +87,6 @@ def test_report_through_share_link():
     assert client.post(f"/api/v1/analyses/{body['id']}/report").status_code == 404
     assert client.post(f"/api/v1/analyses/{body['id']}/report?share={token}").status_code == 200
     assert client.get(f"/api/v1/analyses/{body['id']}/report.pdf?share={token}").status_code == 200
-    # 다른 결과의 토큰으로는 열 수 없다
     other = analyze(new_user())
     assert client.post(f"/api/v1/analyses/{other['id']}/report?share={token}").status_code == 404
 

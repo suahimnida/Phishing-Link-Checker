@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import re
 import sys
+import time
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -29,7 +31,6 @@ if str(_ML_DIR) not in sys.path:
 CLAUDE_MODEL = os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-4"
 _CLIP = 6.0
 
-# Claude는 판정하지 않는다. ML이 만든 근거[E]와 RAG가 찾은 대응 가이드[G]만으로 출처가 있는 설명을 쓴다
 COMPOSE_PROMPT = (
     "당신은 피싱 URL 분석 결과를 일반 사용자에게 설명하는 작성자입니다. 판정은 이미 끝났고 당신은 판정하지 않습니다.\n"
     "주어진 [근거]와 [대응 가이드]만 사실로 사용해 3~5문장의 한국어 설명을 쓰세요.\n"
@@ -99,6 +100,7 @@ def _make_client():
 
 def load_rag() -> bool:
     global _state
+    started = time.perf_counter()
 
     meta_path = _index_dir() / "metadata.jsonl"
     scaler_path = _model_dir() / "scaler.joblib"
@@ -132,9 +134,12 @@ def load_rag() -> bool:
         "client": _make_client(),
     }
     logger.info(
-        "RAG 로드 완료: 사례 %d건, Claude 판정 %s",
+        "RAG 로드 완료: 사례 %d건 (피싱 %d건), %.2f초, Claude 설명 %s (%s)",
         len(metadata),
+        int(metadata["label"].sum()),
+        time.perf_counter() - started,
         "사용" if _state["client"] else "미사용",
+        CLAUDE_MODEL,
     )
     return True
 
@@ -195,14 +200,29 @@ def similar(url: str) -> RagResult:
     )
 
 
+# Claude에 넘기는 근거·가이드에서 웹 주소와 전화번호를 지운다.
+# 출처 검사(check_citations)는 설명에 주소나 118·112·1332가 있으면 설명 전체를 버리는데,
+# 가이드 원문 10건 중 3건에 이 번호가 들어 있어 피싱 판정일수록 템플릿으로 떨어졌다 (QA).
+# 연락처와 링크는 화면·리포트에 서버가 따로 보여 준다.
+_STRIP = re.compile(r"https?://\S+|www\.\S+|(?<!\d)\d{2,4}-\d{3,4}-\d{4}(?!\d)|(?<![\d.])(?:112|118|1332)(?![\d.])")
+
+
+def _clean(text: str) -> str:
+    text = _STRIP.sub("", text)
+    return re.sub(r"\(\s*\)|\s{2,}", " ", text).strip()
+
+
 def compose(evidence: list[dict], guides: list[dict]) -> str | None:
     from app.services.guides import check_citations
 
     client = (_state or {}).get("client")
     if client is None or not evidence:
         return None
-    facts = "[근거]\n" + "\n".join(f"[{e['id']}] ({e['source']}) {e['text']}" for e in evidence)
-    facts += "\n\n[대응 가이드]\n" + "\n".join(f"[{g['id']}] {g['title']} - {g['text']} (출처: {g['source']})" for g in guides)
+    facts = "[근거]\n" + "\n".join(f"[{e['id']}] ({e['source']}) {_clean(e['text'])}" for e in evidence)
+    facts += "\n\n[대응 가이드]\n" + "\n".join(
+        f"[{g['id']}] {g['title']} - {_clean(g['text'])} (출처: {g['source']})" for g in guides
+    )
+    started = time.perf_counter()
     try:
         response = client.messages.create(
             model=CLAUDE_MODEL,
@@ -212,8 +232,18 @@ def compose(evidence: list[dict], guides: list[dict]) -> str | None:
         )
         if response.stop_reason == "refusal":
             raise RuntimeError("Claude가 작성을 거부했습니다")
+        usage = getattr(response, "usage", None)
+        logger.info(
+            "Claude 설명 호출: %s, %.2f초, 입력 %s토큰, 출력 %s토큰",
+            CLAUDE_MODEL, time.perf_counter() - started,
+            getattr(usage, "input_tokens", "?"), getattr(usage, "output_tokens", "?"),
+        )
         text = "".join(b.text for b in response.content if b.type == "text")
         return check_citations(text, evidence, guides)
+    except ValueError as error:
+        # 출처 검사에서 걸린 경우: 어떤 규칙에 걸렸는지 한 줄로 남긴다 (템플릿 원인 확인용)
+        logger.warning("Claude 설명이 출처 검사에서 거절되어 템플릿으로 대신합니다: %s", error)
+        return None
     except Exception:
         logger.exception("근거 기반 설명 작성 실패, 템플릿으로 대신합니다")
         return None
