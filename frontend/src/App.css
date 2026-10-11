@@ -31,7 +31,7 @@
 .sidebar-label {
   padding: 0 12px;
   margin-bottom: 10px;
-  color: #687270;
+  color: #8a9391;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -59,7 +59,7 @@
 
 .sidebar-item span {
   width: 20px;
-  color: #687270;
+  color: #8a9391;
   font-size: 17px;
   text-align: center;
 }
@@ -183,4 +183,65 @@
 .shared-error p {
   margin-top: 10px;
   color: #8b9491;
+}
+
+/* =========================
+   QA 수정: 모바일 메뉴, 키보드 포커스
+========================= */
+
+/* 키보드로 이동할 때 현재 위치가 보이게 */
+.sidebar-item:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid #42e8c4;
+  outline-offset: 2px;
+}
+
+/* 600px 이하: 사이드바를 숨기지 않고 가로로 스크롤되는 메뉴 줄로 바꾼다
+   (QA: 모바일에서 분석 기록·소개 페이지로 갈 방법이 없었다) */
+@media (max-width: 600px) {
+  .sidebar {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid #292e2f;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sidebar-section {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .sidebar-label {
+    display: none;
+  }
+
+  .sidebar-item {
+    width: auto;
+    height: 38px;
+    flex: none;
+    gap: 6px;
+    margin: 0;
+    padding: 0 12px;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .sidebar-item span {
+    width: auto;
+    font-size: 14px;
+  }
+
+  .main-content {
+    padding: 20px 16px;
+  }
 }

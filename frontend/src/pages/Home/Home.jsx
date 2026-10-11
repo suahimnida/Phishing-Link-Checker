@@ -1,10 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSavedClientId, listMyAnalyses } from "../../services/api";
+import { verdictInfo } from "../../utils/verdict";
 import PasswordInput from "../../components/PasswordInput/PasswordInput";
 import "./Home.css";
 
-function Home({ onAnalyze, onOpenHistory }) {
+function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
   const [url, setUrl] = useState("");
+  const urlInputRef = useRef(null);
+  // 사이드바 'URL 분석'을 누르면 분석 화면을 바로 열지 않고 이 입력칸으로 안내한다 (QA: 빈 URL로 요청이 나갔다)
+  const [submittedEmpty, setSubmittedEmpty] = useState(false);
+  const urlHint = submittedEmpty || focusRequest > 0;
+
+  useEffect(() => {
+    if (focusRequest > 0) {
+      urlInputRef.current?.focus();
+      urlInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focusRequest]);
   const [isPublic, setIsPublic] = useState(false);
   // 분석 요청자 확인용: 공개 분석에 가린 성명으로 표시하고, 결과를 삭제할 때 식별 암호로 본인을 확인한다
   const [ownerName, setOwnerName] = useState("");
@@ -43,6 +55,8 @@ function Home({ onAnalyze, onOpenHistory }) {
     const trimmedUrl = url.trim();
 
     if (!trimmedUrl) {
+      setSubmittedEmpty(true);
+      urlInputRef.current?.focus();
       return;
     }
 
@@ -115,11 +129,14 @@ function Home({ onAnalyze, onOpenHistory }) {
 
         <div className="url-input-row">
           <input
+            ref={urlInputRef}
             type="text"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="https://example.com"
+            aria-label="분석할 URL"
+            maxLength={2048}
           />
 
           <button
@@ -132,8 +149,10 @@ function Home({ onAnalyze, onOpenHistory }) {
           </button>
         </div>
 
-        <p className="input-help">
-          분석하려는 웹사이트의 URL을 입력해주세요.
+        <p className={`input-help ${urlHint && !url.trim() ? "attention" : ""}`} role="status">
+          {urlHint && !url.trim()
+            ? "분석할 URL을 입력한 뒤 '분석하기'를 눌러 주세요."
+            : "분석하려는 웹사이트의 URL을 입력해주세요."}
         </p>
 
         <div className="visibility-options">
@@ -241,21 +260,7 @@ function Home({ onAnalyze, onOpenHistory }) {
         ) : (
           <div className="recent-list">
             {recentHistory.map((item) => {
-              const verdict = item.verdict;
-
-              const statusClass =
-                verdict === "phishing"
-                  ? "danger"
-                  : verdict === "suspicious"
-                    ? "warning"
-                    : "normal";
-
-              const statusText =
-                verdict === "phishing"
-                  ? "피싱"
-                  : verdict === "suspicious"
-                    ? "의심"
-                    : "정상";
+              const { label: statusText, className: statusClass } = verdictInfo(item.verdict);
 
               return (
                 <div

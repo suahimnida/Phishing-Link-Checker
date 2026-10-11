@@ -61,7 +61,7 @@
 
 .result-target-label,
 .report-label {
-  color: #687270;
+  color: #8a9391;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -183,7 +183,7 @@
 
 .score-unit {
   margin-left: 6px;
-  color: #687270;
+  color: #8a9391;
   font-size: 18px;
 }
 
@@ -231,7 +231,7 @@
 }
 
 .section-heading span {
-  color: #4f5755;
+  color: #7a8381;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -267,7 +267,7 @@
 
 .detection-row p {
   margin-top: 5px;
-  color: #59615f;
+  color: #8a9391;
   font-size: 11px;
 }
 
@@ -287,7 +287,7 @@
 }
 
 .detection-row.not-analyzed > span {
-  color: #59615f;
+  color: #8a9391;
 }
 
 /* 항목별 탐지 근거 */
@@ -459,7 +459,7 @@
 
 .finding p {
   margin-top: 5px;
-  color: #687270;
+  color: #8a9391;
   font-size: 11px;
   line-height: 1.5;
 }
@@ -555,7 +555,7 @@
 
 .assistant-header p {
   margin-top: 5px;
-  color: #687270;
+  color: #8a9391;
   font-size: 11px;
 }
 
@@ -635,7 +635,7 @@
 .report-card p:last-child {
   max-width: 650px;
   margin-top: 7px;
-  color: #687270;
+  color: #8a9391;
   font-size: 11px;
   line-height: 1.5;
 }
@@ -705,5 +705,61 @@
   .report-button {
     width: 100%;
     justify-content: center;
+  }
+}
+/* =========================
+   QA 수정: 판정 불가, 긴 URL
+========================= */
+
+/* 판정 불가(verdict가 null): 회색. 예전에는 '주의'(주황)로 보였다 */
+.risk-card.unknown {
+  border-color: rgba(138, 147, 145, 0.35);
+}
+
+.risk-card.unknown .score-number,
+.risk-card.unknown .risk-label {
+  color: #a7b0ad;
+}
+
+.risk-card.unknown .risk-level {
+  background: rgba(138, 147, 145, 0.12);
+  color: #c9d1ce;
+}
+
+.finding-icon.unknown {
+  background: rgba(138, 147, 145, 0.12);
+  color: #a7b0ad;
+}
+
+.empty-note {
+  color: #8a9391;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 긴 URL·한글 URL이 카드 밖으로 나가지 않게 줄바꿈한다 (QA: 모바일에서 카드를 뚫고 나감) */
+.result-target,
+.result-target > div {
+  min-width: 0;
+}
+
+.result-target-url,
+.finding p,
+.finding h4,
+.detection-row p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  .result-target {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .risk-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

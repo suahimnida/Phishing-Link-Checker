@@ -110,3 +110,14 @@
 li:target {
   background: rgba(66, 232, 196, 0.05);
 }
+
+/* 설명 본문 안의 긴 경로 문자열이 카드 밖으로 나가지 않게 (QA) */
+.grounded-summary,
+.grounded-summary *,
+.evidence-list,
+.evidence-list *,
+.guide-list,
+.guide-list * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

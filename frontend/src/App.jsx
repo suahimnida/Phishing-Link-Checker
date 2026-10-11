@@ -7,7 +7,7 @@ import History from "./pages/History/History";
 import DetectionMethods from "./pages/DetectionMethods/DetectionMethods";
 import Dataset from "./pages/Dataset/Dataset";
 import MLModel from "./pages/MLModel/MLModel";
-import { getSharedAnalysis, wakeServer } from "./services/api";
+import { getAnalysis, getSharedAnalysis, wakeServer } from "./services/api";
 import "./App.css";
 
 function App() {
@@ -22,6 +22,15 @@ function App() {
   // 분석 결과를 삭제한 뒤 분석 기록 화면에 보여 줄 안내
   const [historyNotice, setHistoryNotice] = useState("");
   const [historyTab, setHistoryTab] = useState("mine");
+  // 사이드바 'URL 분석'을 누를 때마다 1씩 올려 홈의 URL 입력칸에 포커스를 준다
+  const [focusRequest, setFocusRequest] = useState(0);
+
+  // 사이드바 'URL 분석': 분석 화면을 바로 열지 않는다.
+  // 예전에는 직전 URL(또는 빈 값)로 분석을 다시 실행해 빈 요청이 나가거나 기록이 중복 저장됐다 (QA)
+  const openUrlInput = () => {
+    setCurrentPage("home");
+    setFocusRequest((n) => n + 1);
+  };
 
   const handleDeleted = () => {
     setAnalysisResult(null);
@@ -42,27 +51,57 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("share");
-    if (!token) return;
-    getSharedAnalysis(token)
-      .then((result) => {
-        setShareToken(token);
-        setTargetUrl(result.url);
-        setAnalysisResult(result);
-        setCurrentPage("result");
-      })
-      .catch(() => {
-        setShareError("공유가 중지됐거나 잘못된 링크입니다.");
-        setCurrentPage("shared-error");
-      });
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("share");
+    const resultId = params.get("result");
+    if (token) {
+      getSharedAnalysis(token)
+        .then((result) => {
+          setShareToken(token);
+          setTargetUrl(result.url);
+          setAnalysisResult(result);
+          setCurrentPage("result");
+        })
+        .catch((error) => {
+          // 링크 문제(404)와 서버에 닿지 못한 경우를 구분한다
+          setShareError(
+            error?.status === 404
+              ? "공유가 중지됐거나 잘못된 링크입니다."
+              : "서버에 연결하지 못했습니다. 서버가 깨어나는 데 30초~1분 걸릴 수 있으니 잠시 후 새로고침해 주세요."
+          );
+          setCurrentPage("shared-error");
+        });
+    } else if (resultId) {
+      // 결과 화면에서 새로고침해도 같은 결과를 다시 연다 (주소의 ?result=분석ID)
+      getAnalysis(resultId)
+        .then((result) => {
+          setTargetUrl(result.url);
+          setAnalysisResult(result);
+          setCurrentPage("result");
+        })
+        .catch(() => {
+          window.history.replaceState(null, "", window.location.pathname);
+        });
+    }
   }, []);
 
-  // 공유된 결과를 보다가 다른 화면으로 가면 주소에서 공유 토큰을 지운다
+  // 주소창을 현재 화면에 맞춘다
+  // - 내 결과를 보는 중이면 ?result=분석ID (새로고침해도 유지)
+  // - 공유 링크로 보는 중이면 ?share=토큰 그대로
+  // - 다른 화면으로 가면 둘 다 지운다
   useEffect(() => {
-    if (currentPage !== "result" && currentPage !== "shared-error" && window.location.search.includes("share=")) {
+    const search = window.location.search;
+    if (currentPage === "shared-error") return;
+    if (currentPage === "result" && shareToken) return;
+    if (currentPage === "result" && analysisResult?.id && analysisResult.saved !== false) {
+      const next = `?result=${encodeURIComponent(analysisResult.id)}`;
+      if (search !== next) window.history.replaceState(null, "", window.location.pathname + next);
+      return;
+    }
+    if (search.includes("share=") || search.includes("result=")) {
       window.history.replaceState(null, "", window.location.pathname);
     }
-  }, [currentPage]);
+  }, [currentPage, shareToken, analysisResult]);
 
   const handleAnalyze = (url, publicStatus, ownerName = null, ownerSecret = null) => {
     setTargetUrl(url);
@@ -107,9 +146,9 @@ function App() {
 
             <button
               className={`sidebar-item ${
-                currentPage === "analysis" ? "active" : ""
+                ["analysis", "result"].includes(currentPage) ? "active" : ""
               }`}
-              onClick={() => setCurrentPage("analysis")}
+              onClick={openUrlInput}
             >
               <span>⌕</span>
               URL 분석
@@ -178,6 +217,7 @@ function App() {
             <Home
               onAnalyze={handleAnalyze}
               onOpenHistory={openHistory}
+              focusRequest={focusRequest}
             />
           )}
 

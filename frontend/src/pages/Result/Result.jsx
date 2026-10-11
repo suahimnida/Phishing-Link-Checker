@@ -3,6 +3,7 @@ import ShareControls from "../../components/Share/ShareControls";
 import GroundedAnalysis from "../../components/Grounded/GroundedAnalysis";
 import ModelExplanation from "../../components/Explanation/ModelExplanation";
 import ReportSection from "../../components/Report/ReportSection";
+import { levelInfo, verdictInfo } from "../../utils/verdict";
 import "./Result.css";
 
 const detectionLabels = {
@@ -28,19 +29,6 @@ const detectionStatusLabels = {
   suspicious: "의심됨",
   normal: "정상",
   not_analyzed: "분석되지 않음",
-};
-
-const riskLevelLabels = {
-  safe: "안전",
-  caution: "주의",
-  warning: "경고",
-  danger: "위험",
-};
-
-const verdictLabels = {
-  phishing: "피싱",
-  suspicious: "의심",
-  normal: "정상",
 };
 
 const modelStatusLabels = {
@@ -90,11 +78,11 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       ([, value]) => value?.status === "suspicious"
     ).length;
 
-  const riskLevel =
-    data.risk_level || "caution";
-
-  const verdict =
-    data.verdict || "suspicious";
+  // 판정이 없으면(verdict가 null) '판정 불가'로 표시한다. 예전에는 기본값이 '주의/의심'이었다 (QA)
+  const verdictView = verdictInfo(data.verdict);
+  const levelView = levelInfo(data.risk_level);
+  const riskLevel = data.risk_level || "unknown";
+  const blacklisted = Boolean(data.blacklist?.matched);
 
   const riskScore =
     data.risk_score !== null &&
@@ -105,13 +93,15 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
   // 백엔드는 신뢰도를 0~1 비율로 보낸다 (예: 0.91). 화면에는 퍼센트로 표시한다
   // 공식 도메인(허용 목록)이면 ML 점수는 참고용이다. 최종 판정과 충돌해 보이지 않게 표시한다 (QA)
   const modelReferenceOnly =
-    Boolean(data.allowlist?.matched) && !data.blacklist?.matched;
+    Boolean(data.allowlist?.matched) && !blacklisted;
   // 모델 판정도 최종 판정과 같은 기준(30점·60점)으로 표시한다.
   // 예전에는 60점 미만을 모두 '정상'으로 표시해, 최종 '의심'(31점)인데 모델 판정은 '정상'으로 보였다 (QA)
   const modelScore = data.model?.risk_score;
   const modelLabel =
     modelScore === null || modelScore === undefined
-      ? "아직 판정되지 않았습니다."
+      ? blacklisted
+        ? "생략 (블랙리스트 확정)"
+        : "판정하지 못했습니다."
       : modelScore >= 60
       ? "피싱"
       : modelScore >= 30
@@ -119,6 +109,15 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       : "정상";
 
   const unsaved = data.saved === false;
+
+  // 최종 위험도를 어떻게 정했는지 상태별로 설명한다 (판정 방식과 다른 '종합하여 판단' 문구를 대신함)
+  const basisText = blacklisted
+    ? "KISA 피싱 사이트 목록과 일치해 피싱으로 확정했습니다. 이때는 ML 모델 분석, 유사 사례 검색, AI 설명을 실행하지 않습니다."
+    : data.verdict == null
+    ? "ML 모델을 사용할 수 없어 위험도를 계산하지 못했습니다. 잠시 후 다시 분석해 주세요."
+    : modelReferenceOnly
+    ? `공식 도메인 목록(${data.allowlist.domain})에 있는 사이트라 ML 점수와 관계없이 정상(최대 25점)으로 판정했습니다.`
+    : "최종 위험도는 KISA 블랙리스트 일치 여부와 URL 문자 패턴 ML 모델 점수로 정합니다. 탐지 결과, 유사 사례, AI 설명은 판단 근거를 보여 주는 참고 정보입니다.";
 
   const confidence =
     data.confidence !== null &&
@@ -198,8 +197,7 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
           </div>
 
           <span className="risk-level">
-            {riskLevelLabels[riskLevel] ||
-              riskLevel}
+            {levelView.label}
           </span>
         </div>
 
@@ -209,8 +207,7 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
           </p>
 
           <h3>
-            {verdictLabels[verdict] ||
-              verdict} 
+            {verdictView.label}
           </h3>
 
           <p>
@@ -219,10 +216,7 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
               : "판정 신뢰도 정보가 없습니다."}
           </p>
 
-          <p>
-            최종 위험도는 URL 분석 결과와 ML 모델 분석 결과를
-            종합하여 판단됩니다.
-          </p>
+          <p>{basisText}</p>
         </div>
       </div>
 
@@ -478,8 +472,12 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
               )
             )
           ) : (
-            <p>
-              유사 사례가 없습니다.
+            <p className="empty-note">
+              {blacklisted
+                ? "블랙리스트로 확정되어 유사 사례를 검색하지 않았습니다."
+                : modelReferenceOnly
+                ? "공식 도메인이라 유사 사례를 표시하지 않습니다. (URL 특징만 비슷한 피싱 사례가 나와 판정과 반대되는 인상을 줄 수 있기 때문입니다)"
+                : "유사 사례가 없습니다."}
             </p>
           )}
         </div>
@@ -504,6 +502,8 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
               className={`finding-icon ${
                 data.model?.status === "ready"
                   ? "normal"
+                  : blacklisted
+                  ? "unknown"
                   : "danger"
               }`}
             >
@@ -514,11 +514,11 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
               <h4>모델 상태</h4>
 
               <p>
-                {modelStatusLabels[
-                  data.model?.status
-                ] ||
-                  data.model?.status ||
-                  "확인되지 않음"}
+                {blacklisted
+                  ? "블랙리스트로 확정되어 모델 분석을 생략했습니다."
+                  : modelStatusLabels[data.model?.status] ||
+                    data.model?.status ||
+                    "확인되지 않음"}
               </p>
             </div>
           </div>
@@ -537,7 +537,9 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
                 data.model?.risk_score !==
                   undefined
                   ? `${data.model.risk_score} / 100${modelReferenceOnly ? " (참고용)" : ""}`
-                  : "아직 산출되지 않았습니다."}
+                  : blacklisted
+                  ? "생략 (블랙리스트 확정)"
+                  : "계산하지 못했습니다."}
               </p>
             </div>
           </div>
@@ -605,7 +607,10 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       {data.id && !unsaved && <ReportSection key={data.id} analysisId={data.id} shareToken={shareToken} />}
 
       {/* 분석 결과 삭제: 공개 결과만. 분석할 때 입력한 사용자 식별 암호로 본인을 확인한다 */}
-      {data.id && data.is_public && !unsaved && <DeleteSection analysisId={data.id} onDeleted={onDeleted} />}
+      {/* 공유 링크로 연 화면은 읽기 전용이라 삭제 버튼을 숨긴다 (공개 결과는 '공개 분석'에서 열면 삭제할 수 있다) */}
+      {data.id && data.is_public && !unsaved && data.viewer !== "shared" && (
+        <DeleteSection analysisId={data.id} onDeleted={onDeleted} />
+      )}
     </section>
   );
 }

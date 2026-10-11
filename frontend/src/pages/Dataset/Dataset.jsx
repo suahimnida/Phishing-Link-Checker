@@ -6,8 +6,8 @@ const datasets = [
     name: "KISA 피싱사이트 데이터",
     type: "피싱 사례 데이터",
     description:
-      "한국인터넷진흥원에서 제공하는 피싱사이트 관련 데이터를 활용하여 알려진 피싱 사이트 사례를 확인합니다.",
-    usage: "피싱 사이트 사례 확인 및 분석 결과 보조",
+      "한국인터넷진흥원이 공개한 피싱 사이트 목록(2024)입니다. 입력한 URL이 목록과 일치하면 피싱으로 확정하고, ML 학습 데이터에도 피싱 사례로 넣었습니다.",
+    usage: "블랙리스트 확정 판정, ML 학습(피싱)",
     source: "한국인터넷진흥원(KISA)",
   },
   {
@@ -15,18 +15,27 @@ const datasets = [
     name: "PHIUSIIL",
     type: "URL 데이터셋",
     description:
-      "정상 및 피싱 URL 데이터를 기반으로 URL의 다양한 특징을 분석하고 피싱 탐지 모델 개발에 활용합니다.",
-    usage: "URL 특징 분석 및 ML 기반 탐지",
+      "정상·피싱 URL 데이터셋입니다. 정상 URL이 모두 https://www. 형태라 그대로 쓰면 형태만 보고 판단하는 편향이 생겨, 스킴과 www 형태를 무작위로 바꿔 학습에 썼습니다.",
+    usage: "ML 학습(정상·피싱)",
     source: "UCI Machine Learning Repository",
   },
   {
     number: "03",
-    name: "보안 문서 및 RAG 자료",
-    type: "보안 지식 데이터",
+    name: "공개 URL 데이터셋",
+    type: "URL 데이터셋",
     description:
-      "피싱 및 웹 보안과 관련된 공개 문서와 보안 자료를 활용하여 분석 결과에 대한 근거와 대응 방법을 제공합니다.",
-    usage: "분석 근거 및 보안 대응 방법 제공",
-    source: "공개 보안 자료",
+      "경로가 있는 정상 URL과 다양한 형태의 악성 URL을 보충하기 위해 함께 학습했습니다. 세 데이터를 합쳐 약 19만 건(학습 15.3만 · 검증 3.8만)을 도메인이 겹치지 않게 나눴습니다.",
+    usage: "ML 학습(정상·피싱), 유사 사례 검색 5,000건",
+    source: "faizann24 / Using-machine-learning-to-detect-malicious-URLs (GitHub)",
+  },
+  {
+    number: "04",
+    name: "공식 기관 대응 가이드",
+    type: "RAG 검색 자료",
+    description:
+      "피싱 신고, 계정·금융 피해 대응, 예방 방법을 담은 공식 기관 안내 10건입니다. 분석 근거에 맞는 가이드를 찾아 AI 설명과 리포트에 출처와 함께 넣습니다.",
+    usage: "대응 가이드 검색, AI 설명·리포트의 출처",
+    source: "KISA 보호나라·118, 금융감독원, 금융결제원, KAIT 엠세이퍼, 경찰청 ECRM",
   },
 ];
 

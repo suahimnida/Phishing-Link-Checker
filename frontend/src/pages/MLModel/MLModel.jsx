@@ -3,7 +3,7 @@ import "./MLModel.css";
 // 서비스 모델 v2 (backend/ml_integration/models/url_model_v2_report.json)
 const features = [
   "문자 n-gram (3~5글자)",
-  "URL 원문 그대로 (대소문자·특수문자 유지)",
+  "URL 원문 (스킴·도메인만 소문자로, 홈페이지 끝 '/' 제거)",
   "로지스틱 회귀 분류",
   "검증 세트로 정한 판정 기준점",
 ];
@@ -42,7 +42,9 @@ function MLModel() {
               뽑아 정상·피싱 URL로 학습한 모델이 위험도를
               계산합니다. 학습에 없던 데이터로 평가했을 때
               정상 URL을 피싱으로 잘못 판정하는 비율은 34.2%,
-              피싱을 놓치는 비율은 13.3%입니다.
+              피싱을 놓치는 비율은 10.3%입니다(ROC-AUC 0.879).
+              공식 도메인 허용 목록에 있는 사이트는 ML 점수와
+              관계없이 정상으로 판정합니다.
             </p>
           </div>
         </div>
@@ -139,7 +141,7 @@ function MLModel() {
         <div className="ml-info-card">
           <span>INPUT</span>
           <strong>URL 원문</strong>
-          <p>입력한 URL 문자열</p>
+          <p>입력한 URL 문자열 (대소문자 표기 차이로 점수가 바뀌지 않게 정규화)</p>
         </div>
 
         <div className="ml-info-card">

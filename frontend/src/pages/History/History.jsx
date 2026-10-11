@@ -2,16 +2,20 @@ import { useEffect, useState } from "react";
 import "./History.css";
 
 import { getAnalysis, listMyAnalyses, listPublicAnalyses } from "../../services/api";
+import { verdictInfo } from "../../utils/verdict";
 
 function History({ onViewResult, initialTab = "mine", notice = "" }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  // 불러오기 실패를 '기록 없음'과 구분한다 (QA: 서버가 잠들어 있으면 기록이 사라진 것처럼 보였다)
+  const [loadError, setLoadError] = useState("");
   // mine: 이 브라우저의 기록 / public: 다른 사용자가 공개한 결과
   const [tab, setTab] = useState(initialTab);
 
   useEffect(() => {
     const loadHistory = async () => {
       setLoading(true);
+      setLoadError("");
       try {
         const items = tab === "mine" ? await listMyAnalyses() : await listPublicAnalyses();
 
@@ -22,6 +26,11 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
           error
         );
         setHistory([]);
+        setLoadError(
+          error?.status === 0
+            ? "서버에 연결하지 못했습니다. 서버가 깨어나는 데 30초~1분 걸릴 수 있으니 잠시 후 다시 열어 주세요."
+            : "분석 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+        );
       } finally {
         setLoading(false);
       }
@@ -53,7 +62,9 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
       );
 
       alert(
-        "분석 결과를 불러오지 못했습니다."
+        error?.status === 404
+          ? "삭제됐거나 볼 수 없는 분석 결과입니다."
+          : "분석 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
       );
     }
   };
@@ -75,26 +86,7 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
     );
   };
 
-  const getRiskStatus = (verdict) => {
-    if (verdict === "phishing") {
-      return {
-        label: "피싱 의심",
-        className: "danger",
-      };
-    }
-
-    if (verdict === "suspicious") {
-      return {
-        label: "주의 필요",
-        className: "warning",
-      };
-    }
-
-    return {
-      label: "정상",
-      className: "normal",
-    };
-  };
+  const getRiskStatus = (verdict) => verdictInfo(verdict);
 
   if (loading) {
     return (
@@ -147,6 +139,13 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
       {tabs}
 
       {notice && <p className="history-notice">{notice}</p>}
+      {/* 기록은 브라우저 ID로 찾는다. 브라우저 데이터를 지우거나 다른 기기에서 열면 내 기록이 보이지 않는다 */}
+      {tab === "mine" && (
+        <p className="history-storage-note">
+          내 기록은 이 브라우저에만 연결되어 있습니다. 브라우저 데이터(사이트 데이터·쿠키)를 지우거나 다른
+          브라우저·기기에서 열면 내 기록이 보이지 않습니다. 공개한 결과는 '공개 분석'에서 계속 볼 수 있습니다.
+        </p>
+      )}
 
       {/* Empty */}
       {history.length === 0 ? (
@@ -155,10 +154,18 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
             ◷
           </div>
 
-          <h3>{tab === "mine" ? "분석 기록이 없습니다." : "공개된 분석 결과가 없습니다."}</h3>
+          <h3>
+            {loadError
+              ? "분석 기록을 불러오지 못했습니다."
+              : tab === "mine"
+              ? "분석 기록이 없습니다."
+              : "공개된 분석 결과가 없습니다."}
+          </h3>
           <p>
-            {tab === "mine"
-              ? "웹사이트를 분석하면 이곳에서 분석 기록을 확인할 수 있습니다."
+            {loadError
+              ? loadError
+              : tab === "mine"
+              ? "웹사이트를 분석하면 이곳에서 분석 기록을 확인할 수 있습니다. 브라우저 데이터를 지웠다면 이전 기록은 이 브라우저에서 다시 볼 수 없습니다."
               : "분석할 때 '공개'를 선택하거나 결과 화면에서 공개로 바꾸면 이곳에 표시됩니다."}
           </p>
         </div>

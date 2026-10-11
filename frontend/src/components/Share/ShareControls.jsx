@@ -69,7 +69,21 @@ function ShareControls({ result, onChange }) {
 
   const copyLink = () =>
     run(async () => {
-      await navigator.clipboard.writeText(link);
+      // 클립보드 API가 없거나(일부 구형 브라우저·http 주소) 권한이 막힌 경우를 대비해 예전 방식으로 한 번 더 시도한다
+      try {
+        await navigator.clipboard.writeText(link);
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = link;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(area);
+        if (!copied) throw new Error("복사하지 못했습니다");
+      }
     }, "링크를 복사했어요.");
 
   return (
