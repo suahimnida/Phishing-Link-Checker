@@ -395,7 +395,11 @@ def _report_client():
     return _llm_clients["report"]
 
 
-def _load_report(analysis_id: str, client_key: str | None, share: str | None = None) -> ReportResponse:
+def _report_access(analysis_id: str, client_key: str | None, share: str | None):
+    """리포트를 볼 수 있는 사람인지 확인하고 (분석 결과, 분석 시각)을 돌려준다.
+
+    본인·공개 결과는 브라우저 ID로, 비공개 결과는 그 결과의 공유 토큰으로만 열 수 있다.
+    """
     record = db.get_analysis_record(analysis_id, client_key)
     if record is None and share:
         shared = db.get_shared(share)
@@ -403,7 +407,11 @@ def _load_report(analysis_id: str, client_key: str | None, share: str | None = N
             record = shared
     if record is None:
         raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
-    analysis, analyzed_at = record
+    return record
+
+
+def _load_report(analysis_id: str, client_key: str | None, share: str | None = None) -> ReportResponse:
+    analysis, analyzed_at = _report_access(analysis_id, client_key, share)
 
     cached = db.get_report(analysis_id)
     if cached is not None:
@@ -424,6 +432,24 @@ def _load_report(analysis_id: str, client_key: str | None, share: str | None = N
         except Exception:
             logger.exception("리포트 저장 실패: %s", analysis_id)
     return result
+
+
+@app.get("/api/v1/analyses/{analysis_id}/report", response_model=ReportResponse)
+def read_saved_report(
+    analysis_id: str,
+    share: str | None = Query(None, description="공유 링크 토큰"),
+    x_client_id: uuid.UUID | None = Header(None),
+):
+    """이미 만든 리포트만 돌려준다. 없으면 404이고 새로 만들지 않는다 (LLM 호출 없음).
+
+    결과 화면을 열 때 프론트가 이것으로 저장된 리포트를 바로 보여 준다.
+    예전에는 버튼을 다시 눌러야 저장본이 보여서 리포트가 사라진 것처럼 보였다 (QA).
+    """
+    _report_access(analysis_id, _client_key(x_client_id), share)
+    cached = db.get_report(analysis_id)
+    if cached is None:
+        raise HTTPException(status_code=404, detail="아직 만든 리포트가 없습니다.")
+    return cached
 
 
 @app.post("/api/v1/analyses/{analysis_id}/report", response_model=ReportResponse)

@@ -183,3 +183,29 @@ def test_access_log_hides_share_token():
                                ("1.2.3.4", "GET", "/api/v1/shared/SECRETTOKEN", "1.1", 200), None)
     main._RedactShareToken().filter(record)
     assert "SECRETTOKEN" not in record.getMessage()
+
+
+# ---------- 저장된 리포트 조회 ----------
+
+def test_saved_report_is_returned_without_generating(monkeypatch):
+    h = headers()
+    aid = analyze(h=h).json()["id"]
+    assert client.get(f"/api/v1/analyses/{aid}/report", headers=h).status_code == 404
+
+    calls = []
+    original = main.followup.research
+    monkeypatch.setattr(main.followup, "research", lambda *a, **k: (calls.append(1), original(*a, **k))[1])
+    created = client.post(f"/api/v1/analyses/{aid}/report", headers=h).json()
+
+    saved = client.get(f"/api/v1/analyses/{aid}/report", headers=h)
+    assert saved.status_code == 200 and saved.json()["created_at"] == created["created_at"]
+    assert len(calls) == 1  # GET은 LLM을 부르지 않는다
+
+
+def test_saved_report_follows_same_access_rules():
+    owner_h, other_h = headers(), headers()
+    aid = analyze(h=owner_h).json()["id"]
+    client.post(f"/api/v1/analyses/{aid}/report", headers=owner_h)
+    assert client.get(f"/api/v1/analyses/{aid}/report", headers=other_h).status_code == 404
+    token = client.post(f"/api/v1/analyses/{aid}/share", headers=owner_h).json()["token"]
+    assert client.get(f"/api/v1/analyses/{aid}/report?share={token}", headers=other_h).status_code == 200
