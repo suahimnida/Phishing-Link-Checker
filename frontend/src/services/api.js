@@ -124,6 +124,24 @@ function shareQuery(shareToken) {
   return shareToken ? `?share=${encodeURIComponent(shareToken)}` : "";
 }
 
+// 이미 만든 리포트가 있으면 가져온다. 없으면 null (새로 만들지 않음, LLM 호출 없음)
+export async function getSavedReport(analysisId, shareToken = null) {
+  const clientId = getSavedClientId();
+
+  try {
+    return await request(
+      `/api/v1/analyses/${analysisId}/report${shareQuery(shareToken)}`,
+      { headers: clientId ? { "X-Client-Id": clientId } : {} },
+      "저장된 리포트 조회 실패"
+    );
+  } catch (error) {
+    if (error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 export async function createReport(analysisId, shareToken = null) {
   const clientId = await getClientId();
 

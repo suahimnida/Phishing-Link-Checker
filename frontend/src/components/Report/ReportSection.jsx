@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   createReport,
+  getSavedReport,
   fetchReportPdf,
   reportFileName,
 } from "../../services/api";
@@ -89,6 +90,27 @@ function ReportSection({ analysisId, shareToken = null }) {
   const [status, setStatus] = useState("idle"); // idle | loading | error
   const [pdfBusy, setPdfBusy] = useState(null); // view | save | null
   const [message, setMessage] = useState("");
+
+  // 결과 화면을 열 때 이미 만든 리포트가 있으면 바로 보여 준다.
+  // 예전에는 다시 열면 버튼이 '리포트 생성'으로 돌아가 리포트가 사라진 것처럼 보였다 (QA)
+  useEffect(() => {
+    let cancelled = false;
+
+    getSavedReport(analysisId, shareToken)
+      .then((saved) => {
+        if (!cancelled && saved) {
+          setReport(saved);
+        }
+      })
+      .catch((error) => {
+        // 조회에 실패해도 '리포트 생성' 버튼으로 다시 시도할 수 있으므로 화면에는 알리지 않는다
+        console.error("저장된 리포트 조회 실패:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisId, shareToken]);
 
   async function handleGenerate() {
     setStatus("loading");
