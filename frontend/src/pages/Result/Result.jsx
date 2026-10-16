@@ -5,6 +5,8 @@ import ModelExplanation from "../../components/Explanation/ModelExplanation";
 import ReportSection from "../../components/Report/ReportSection";
 import QuickVerdict from "../../components/QuickVerdict/QuickVerdict";
 import DetailCard from "../../components/DetailCard/DetailCard";
+import Findings from "../../components/Findings/Findings";
+import Checks from "../../components/Checks/Checks";
 import { verdictInfo } from "../../utils/verdict";
 import "./Result.css";
 
@@ -129,6 +131,15 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
   // 정상 판정이면 피해 대응 가이드를 보여 주지 않는다 (불필요한 불안을 주지 않기 위해)
   const isNormal = data.verdict === "normal";
   const aiReady = Boolean(data.ai_analysis?.summary);
+  const findings = Array.isArray(data.findings) ? data.findings : [];
+  const reasonSummary =
+    findings.length > 0
+      ? `의심 특징 ${findings.length}개와 출처가 표시된 설명`
+      : aiReady
+      ? "출처가 표시된 설명"
+      : "설명 없음";
+  const reputationChecks = data.detections?.reputation?.checks || [];
+  const checksSummary = `신고 목록, 주소 생김새${reputationChecks.length ? `, 공개 기록 ${reputationChecks.length}가지` : ""}`;
   const guideCount = data.ai_analysis?.guides?.length || 0;
   const hasFeatures =
     data.extracted_features && Object.keys(data.extracted_features).length > 0;
@@ -169,11 +180,13 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
           <p>판단 근거가 궁금하면 항목을 눌러 펼쳐 보세요.</p>
         </div>
 
-        <DetailCard
-          title="왜 이렇게 판정했나요?"
-          summary={aiReady ? "출처가 표시된 설명" : "설명 없음"}
-        >
+        <DetailCard title="왜 이렇게 판정했나요?" summary={reasonSummary}>
+          <Findings findings={findings} />
           <GroundedAnalysis ai={data.ai_analysis} rag={data.rag} part="ai" />
+        </DetailCard>
+
+        <DetailCard title="접속하지 않고 확인한 정보" summary={checksSummary}>
+          <Checks data={data} />
         </DetailCard>
 
         {!isNormal && (

@@ -1,0 +1,148 @@
+.after-click {
+  max-width: 640px;
+  margin-top: 12px;
+}
+
+.after-click-toggle {
+  padding: 10px 16px;
+  border: 1px solid #3a4041;
+  border-radius: 8px;
+  background: transparent;
+  color: #f4f7f6;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.after-click-toggle::after {
+  content: " +";
+  color: #8a9391;
+}
+
+.after-click-toggle[aria-expanded="true"]::after {
+  content: " −";
+}
+
+.after-click-toggle:hover {
+  border-color: #8a9391;
+}
+
+.after-click-toggle:focus-visible,
+.after-click-options button:focus-visible,
+.contact-call:focus-visible {
+  outline: 2px solid #42e8c4;
+  outline-offset: 2px;
+}
+
+.after-click-panel {
+  margin-top: 12px;
+  padding: 16px 18px;
+  border: 1px solid #292e2f;
+  border-radius: 10px;
+  background: #0d1011;
+}
+
+.after-click-hint,
+.after-click-error {
+  color: #c9d1ce;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.after-click-error {
+  color: #ffb84d;
+}
+
+.after-click-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.after-click-options button {
+  padding: 8px 12px;
+  border: 1px solid #3a4041;
+  border-radius: 999px;
+  background: #131617;
+  color: #c9d1ce;
+  font-size: 13px;
+  text-align: left;
+}
+
+.after-click-options button.selected {
+  border-color: #f4f7f6;
+  background: #f4f7f6;
+  color: #0a0c0d;
+  font-weight: 700;
+}
+
+.after-click-result {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #292e2f;
+}
+
+.after-click-action + .after-click-action {
+  margin-top: 14px;
+}
+
+.after-click-result h4 {
+  color: #f4f7f6;
+  font-size: 14px;
+}
+
+.after-click-action ol {
+  margin-top: 6px;
+  padding-left: 20px;
+  color: #c9d1ce;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.after-click-action li + li {
+  margin-top: 4px;
+}
+
+.after-click-contacts {
+  margin-top: 16px;
+}
+
+.after-click-contacts ul {
+  margin-top: 8px;
+  list-style: none;
+}
+
+.after-click-contacts li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.after-click-contacts li + li {
+  margin-top: 10px;
+}
+
+.contact-call {
+  flex-shrink: 0;
+  min-width: 64px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #42e8c4;
+  color: #0a0c0d;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.after-click-contacts strong {
+  color: #f4f7f6;
+  font-size: 13px;
+}
+
+.after-click-contacts p {
+  margin-top: 2px;
+  color: #8a9391;
+  font-size: 12px;
+  line-height: 1.5;
+}

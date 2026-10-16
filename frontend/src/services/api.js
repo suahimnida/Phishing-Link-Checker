@@ -255,3 +255,16 @@ export async function deleteAnalysis(analysisId, name, secret, confirmText) {
   }
   return response.json();
 }
+
+// '이미 눌렀다면?' 상황별 조치와 공식 연락처. 내용이 바뀌지 않으므로 한 번만 불러와 재사용한다
+let responseGuidePromise = null;
+
+export function getResponseGuide() {
+  if (!responseGuidePromise) {
+    responseGuidePromise = request("/api/v1/response-guide", {}, "대응 안내 조회 실패").catch((error) => {
+      responseGuidePromise = null;
+      throw error;
+    });
+  }
+  return responseGuidePromise;
+}

@@ -1,3 +1,4 @@
+import AfterClick from "../AfterClick/AfterClick";
 import { userSummary } from "../../utils/userSummary";
 import "./QuickVerdict.css";
 
@@ -31,6 +32,8 @@ function QuickVerdict({ data, url }) {
         </div>
       )}
 
+      {(summary.level === "danger" || summary.level === "caution") && <AfterClick />}
+
       {summary.level === "safe" && (
         <p className="quick-verdict-note">
           위험 신호가 없다는 뜻이고, 안전을 보장하지는 않아요. 열기 전에 주소창의 주소가 맞는지
@@ -39,7 +42,8 @@ function QuickVerdict({ data, url }) {
       )}
 
       <p className="quick-verdict-scope">
-        이 사이트에 직접 접속하지 않고, 주소와 공개된 등록 정보만으로 확인했어요.
+        이 사이트에 직접 접속하지 않고, 주소와 공개된 기록만으로 확인했어요. 무엇을 확인했는지는
+        아래 '접속하지 않고 확인한 정보'에서 볼 수 있어요.
       </p>
     </section>
   );

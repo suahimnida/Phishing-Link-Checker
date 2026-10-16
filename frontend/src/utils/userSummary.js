@@ -23,6 +23,11 @@ function detectionReasons(data) {
 
 // ML 판정일 때, 탐지 결과에서 사용자가 이해하기 쉬운 이유를 하나 고른다
 function mlReason(data, verdict) {
+  // 백엔드가 쉬운 말로 정리한 의심 특징(findings)이 있으면 가장 앞의 것을 쓴다
+  const first = Array.isArray(data.findings) ? data.findings[0] : null;
+  if (first?.title) {
+    return first.title;
+  }
   const reasons = detectionReasons(data).join(" ");
   if (reasons.includes("브랜드") || reasons.includes("공식 도메인(")) {
     return "유명 회사나 기관 이름을 넣어 진짜처럼 꾸민 주소예요.";

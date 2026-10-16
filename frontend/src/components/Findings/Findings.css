@@ -1,0 +1,93 @@
+.findings {
+  margin-bottom: 18px;
+}
+
+.findings-hint {
+  color: #8a9391;
+  font-size: 13px;
+}
+
+.findings ul {
+  margin-top: 10px;
+  list-style: none;
+}
+
+.finding-item {
+  padding: 16px 18px;
+  border: 1px solid #292e2f;
+  border-left: 3px solid #ffb84d;
+  border-radius: 10px;
+  background: #0d1011;
+}
+
+.finding-item + .finding-item {
+  margin-top: 10px;
+}
+
+.finding-item h4 {
+  color: #f4f7f6;
+  font-size: 15px;
+}
+
+.finding-item dl {
+  margin-top: 8px;
+}
+
+.finding-item dt {
+  margin-top: 8px;
+  color: #8a9391;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.finding-item dd {
+  margin-top: 2px;
+  color: #c9d1ce;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.finding-stat {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #131617;
+}
+
+.finding-stat-bars {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  justify-content: start;
+  align-items: baseline;
+  column-gap: 8px;
+}
+
+.bar-label {
+  color: #8a9391;
+  font-size: 12px;
+}
+
+.bar-value {
+  margin-right: 14px;
+  color: #f4f7f6;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.finding-stat p {
+  margin-top: 6px;
+  color: #c9d1ce;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.finding-source,
+.finding-detail {
+  color: #8a9391;
+}
+
+.finding-detail {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
