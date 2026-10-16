@@ -1,0 +1,86 @@
+.detail-card {
+  border: 1px solid #292e2f;
+  border-radius: 10px;
+  background: #131617;
+}
+
+.detail-card + .detail-card {
+  margin-top: 10px;
+}
+
+.detail-card summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.detail-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-card summary::after {
+  content: "+";
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #8a9391;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.detail-card[open] summary::after {
+  content: "−";
+}
+
+.detail-card summary:focus-visible {
+  outline: 2px solid #42e8c4;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.detail-card-title {
+  color: #f4f7f6;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.detail-card-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: #8a9391;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-card-body {
+  padding: 0 20px 20px;
+}
+
+/* 카드 안에 들어간 기존 섹션은 카드 제목이 대신하므로 자체 제목과 바깥 여백을 숨긴다 */
+.detail-card-body .result-section {
+  margin-top: 0;
+}
+
+.detail-card-body .section-heading {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .detail-card summary {
+    flex-wrap: wrap;
+    padding: 14px 16px;
+  }
+
+  .detail-card-summary {
+    order: 3;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .detail-card-body {
+    padding: 0 16px 16px;
+  }
+}

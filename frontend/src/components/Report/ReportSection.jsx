@@ -9,10 +9,11 @@ import {
 
 import "./ReportSection.css";
 
+// 결과 화면과 같은 3단계 이름을 쓰고, 괄호 안에 리포트 본문의 판정 이름을 함께 적는다
 const verdictLabels = {
-  phishing: "피싱",
-  suspicious: "의심",
-  normal: "정상",
+  phishing: "위험 (피싱)",
+  suspicious: "주의 (피싱 의심)",
+  normal: "안전 (정상)",
 };
 
 const levelLabels = {

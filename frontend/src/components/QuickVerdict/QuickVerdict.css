@@ -1,0 +1,117 @@
+.quick-verdict {
+  --tone: #8a9391;
+  --tone-bg: rgba(138, 147, 145, 0.08);
+
+  margin-top: 8px;
+  padding: 28px 30px 24px;
+  border: 1px solid #292e2f;
+  border-left: 6px solid var(--tone);
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--tone-bg), transparent 60%), #131617;
+}
+
+.quick-verdict.danger {
+  --tone: #ff4d5a;
+  --tone-bg: rgba(255, 77, 90, 0.1);
+}
+
+.quick-verdict.caution {
+  --tone: #ffb84d;
+  --tone-bg: rgba(255, 184, 77, 0.09);
+}
+
+.quick-verdict.safe {
+  --tone: #42e8c4;
+  --tone-bg: rgba(66, 232, 196, 0.07);
+}
+
+.quick-verdict-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.quick-verdict-badge {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--tone);
+  color: #0a0c0d;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.quick-verdict-url {
+  min-width: 0;
+  overflow: hidden;
+  color: #8a9391;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-verdict-headline {
+  margin-top: 18px;
+  color: var(--tone);
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.quick-verdict-reason {
+  max-width: 640px;
+  margin-top: 10px;
+  color: #f4f7f6;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.quick-verdict-action {
+  max-width: 640px;
+  margin-top: 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--tone);
+  border-radius: 10px;
+  background: #0d1011;
+}
+
+.quick-verdict-action strong {
+  color: var(--tone);
+  font-size: 13px;
+}
+
+.quick-verdict-action p {
+  margin-top: 4px;
+  color: #f4f7f6;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.quick-verdict-note {
+  max-width: 640px;
+  margin-top: 16px;
+  color: #c9d1ce;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.quick-verdict-scope {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #292e2f;
+  color: #8a9391;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .quick-verdict {
+    padding: 22px 18px 18px;
+  }
+
+  .quick-verdict-reason {
+    font-size: 16px;
+  }
+}

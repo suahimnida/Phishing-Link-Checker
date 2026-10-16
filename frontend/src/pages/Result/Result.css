@@ -763,3 +763,53 @@
     align-items: flex-start;
   }
 }
+
+/* 자세히 보기 */
+
+.detail-group {
+  margin-top: 36px;
+}
+
+.detail-group-heading {
+  margin-bottom: 14px;
+}
+
+.detail-group-heading h3 {
+  font-size: 18px;
+}
+
+.detail-group-heading p {
+  margin-top: 4px;
+  color: #8a9391;
+  font-size: 13px;
+}
+
+/* 카드 안의 위험도 박스는 카드가 이미 테두리를 가지므로 겹치는 여백을 줄인다 */
+.detail-card-body .risk-card {
+  margin-top: 0;
+}
+
+/* 결과 관리 (공유·리포트·삭제) */
+
+.result-manage {
+  margin-top: 36px;
+}
+
+@media (max-width: 600px) {
+  .detail-card-body .risk-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .detail-card-body .risk-score {
+    padding-right: 0;
+    border-right: 0;
+  }
+}
+
+/* 결과 화면 맨 위 여백 (예전 제목 영역을 대신함) */
+.result-page > :first-child {
+  margin-top: 40px;
+}

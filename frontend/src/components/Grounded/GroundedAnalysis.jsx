@@ -1,12 +1,27 @@
 import "./GroundedAnalysis.css";
 
+// 출처가 접힌 '자세히 보기' 카드 안에 있으면 카드를 펼친 뒤 그 위치로 이동한다
+function openCitation(event, id) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  event.preventDefault();
+  const card = target.closest("details");
+  if (card) card.open = true;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 // 설명 문장 속 [E1], [G2] 번호를 눈에 띄게 표시한다
 function withCitations(text) {
   return text.split(/(\[[EG]\d+\])/g).map((part, i) => {
     const match = part.match(/^\[([EG])(\d+)\]$/);
     if (!match) return <span key={i}>{part}</span>;
     return (
-      <a key={i} href={`#cite-${match[1]}${match[2]}`} className={`cite cite-${match[1]}`}>
+      <a
+        key={i}
+        href={`#cite-${match[1]}${match[2]}`}
+        className={`cite cite-${match[1]}`}
+        onClick={(event) => openCitation(event, `cite-${match[1]}${match[2]}`)}
+      >
         {match[1]}
         {match[2]}
       </a>
@@ -14,7 +29,8 @@ function withCitations(text) {
   });
 }
 
-function GroundedAnalysis({ ai, rag }) {
+// part: "guides"(대응 가이드만) / "ai"(AI 설명만) / 생략하면 둘 다
+function GroundedAnalysis({ ai, rag, part }) {
   const evidence = ai?.evidence || [];
   const guides = ai?.guides || [];
   const legacySources = guides.length === 0 ? rag?.source || [] : [];
@@ -22,6 +38,7 @@ function GroundedAnalysis({ ai, rag }) {
   return (
     <>
       {/* ② RAG: 근거에 맞는 공식 기관 대응 가이드 */}
+      {part !== "ai" && (
       <div className="result-section">
         <div className="section-heading">
           <div>
@@ -62,8 +79,10 @@ function GroundedAnalysis({ ai, rag }) {
           )}
         </div>
       </div>
+      )}
 
       {/* ③ LLM: ML 근거[E]와 가이드[G]를 합쳐 출처가 있는 설명 */}
+      {part !== "guides" && (
       <div className="result-section">
         <div className="section-heading">
           <div>
@@ -83,7 +102,7 @@ function GroundedAnalysis({ ai, rag }) {
             <>
               <p className="grounded-hint">
                 설명의 <span className="cite cite-E">E</span> 번호는 아래 분석 근거,{" "}
-                <span className="cite cite-G">G</span> 번호는 위 대응 가이드를 가리켜요. AI는 위험도를
+                <span className="cite cite-G">G</span> 번호는 대응 가이드 카드를 가리켜요. AI는 위험도를
                 정하지 않고, 이 근거와 가이드만으로 설명을 써요.
               </p>
               <ul className="evidence-list">
@@ -104,6 +123,7 @@ function GroundedAnalysis({ ai, rag }) {
           )}
         </div>
       </div>
+      )}
     </>
   );
 }

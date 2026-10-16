@@ -3,7 +3,9 @@ import ShareControls from "../../components/Share/ShareControls";
 import GroundedAnalysis from "../../components/Grounded/GroundedAnalysis";
 import ModelExplanation from "../../components/Explanation/ModelExplanation";
 import ReportSection from "../../components/Report/ReportSection";
-import { levelInfo, verdictInfo } from "../../utils/verdict";
+import QuickVerdict from "../../components/QuickVerdict/QuickVerdict";
+import DetailCard from "../../components/DetailCard/DetailCard";
+import { verdictInfo } from "../../utils/verdict";
 import "./Result.css";
 
 const detectionLabels = {
@@ -80,7 +82,6 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
 
   // 판정이 없으면(verdict가 null) '판정 불가'로 표시한다. 예전에는 기본값이 '주의/의심'이었다 (QA)
   const verdictView = verdictInfo(data.verdict);
-  const levelView = levelInfo(data.risk_level);
   const riskLevel = data.risk_level || "unknown";
   const blacklisted = Boolean(data.blacklist?.matched);
 
@@ -103,10 +104,10 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
         ? "생략 (블랙리스트 확정)"
         : "판정하지 못했습니다."
       : modelScore >= 60
-      ? "피싱"
+      ? "위험"
       : modelScore >= 30
-      ? "의심"
-      : "정상";
+      ? "주의"
+      : "안전";
 
   const unsaved = data.saved === false;
 
@@ -125,21 +126,28 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       ? Number(data.confidence) * 100
       : null;
 
+  // 정상 판정이면 피해 대응 가이드를 보여 주지 않는다 (불필요한 불안을 주지 않기 위해)
+  const isNormal = data.verdict === "normal";
+  const aiReady = Boolean(data.ai_analysis?.summary);
+  const guideCount = data.ai_analysis?.guides?.length || 0;
+  const hasFeatures =
+    data.extracted_features && Object.keys(data.extracted_features).length > 0;
+
+  const scoreSummary =
+    riskScore !== null
+      ? `${riskScore.toFixed(1)}점 / 100${confidence !== null ? `, 신뢰도 ${Math.round(confidence)}%` : ""}`
+      : "점수 없음";
+  const detectionSummary =
+    detectionEntries.length > 0
+      ? `${detectionEntries.length}개 항목${suspiciousDetectionCount > 0 ? ` 중 의심 ${suspiciousDetectionCount}개` : " 모두 이상 없음"}`
+      : "탐지 데이터 없음";
+  const similarSummary =
+    similarCases.length > 0
+      ? `피싱 ${similarPhishingCount}건, 정상 ${similarCases.length - similarPhishingCount}건`
+      : "표시할 사례 없음";
+
   return (
     <section className="result-page">
-      {/* Header */}
-      <div className="result-header">
-        <p className="eyebrow">보안 분석 결과</p>
-
-        <h2>분석 결과</h2>
-
-        <p className="result-description">
-          입력한 URL의 보안 분석 결과입니다.
-        </p>
-      </div>
-
-      {/* 분석 범위: 사이트에 접속하지 않았다는 점을 결과보다 먼저 밝힌다 */}
-      {/* 공개 범위와 "링크가 있는 사람은 볼 수 있음" */}
       {/* 서버가 결과를 저장하지 못한 경우: 공유·리포트·삭제는 저장된 결과에만 쓸 수 있다 */}
       {unsaved && (
         <div className="analysis-scope">
@@ -151,91 +159,73 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
         </div>
       )}
 
-      {data.viewer && !unsaved && <ShareControls result={data} onChange={onResultChange} />}
+      {/* ① 한눈에 보는 판정: 3단계 판정 + 한 줄 이유 + 지금 할 일 */}
+      <QuickVerdict data={data} url={url} />
 
-      <div className="analysis-scope">
-        <strong>분석 범위</strong>
-        <p>
-          URL 문자열과 공개된 등록 정보(KISA 블랙리스트, 도메인 등록일,
-          인증서 기록, 호스팅 정보)만 확인했습니다. 이 사이트에는 접속하지
-          않았습니다.
-        </p>
-      </div>
-
-      {/* Target */}
-      <div className="result-target">
-        <div>
-          <p className="result-target-label">
-            분석 대상 URL
-          </p>
-
-          <p className="result-target-url">
-            {data.url || url || "-"}
-          </p>
+      {/* ② 자세히 보기: 판단 근거는 궁금한 사용자만 펼쳐 본다 */}
+      <div className="detail-group">
+        <div className="detail-group-heading">
+          <h3>자세히 보기</h3>
+          <p>판단 근거가 궁금하면 항목을 눌러 펼쳐 보세요.</p>
         </div>
 
-        <span className="result-completed">
-          {data.status === "completed"
-            ? "분석 완료"
-            : data.status || "분석 상태 확인 필요"}
-        </span>
-      </div>
+        <DetailCard
+          title="왜 이렇게 판정했나요?"
+          summary={aiReady ? "출처가 표시된 설명" : "설명 없음"}
+        >
+          <GroundedAnalysis ai={data.ai_analysis} rag={data.rag} part="ai" />
+        </DetailCard>
 
-      {/* Overall Risk */}
-      <div className={`risk-card ${riskLevel}`}>
-        <div className="risk-score">
-          <div>
-            <span className="score-number">
-              {riskScore !== null
-                ? riskScore.toFixed(1)
-                : "-"}
-            </span>
+        {!isNormal && (
+          <DetailCard
+            title="공식 기관 대응 방법"
+            summary={guideCount > 0 ? `안내 ${guideCount}건` : "찾은 안내 없음"}
+          >
+            <GroundedAnalysis ai={data.ai_analysis} rag={data.rag} part="guides" />
+          </DetailCard>
+        )}
 
-            <span className="score-unit">
-              / 100
-            </span>
+        <DetailCard title="위험도 점수와 신뢰도" summary={scoreSummary}>
+          <div className={`risk-card ${riskLevel}`}>
+            <div className="risk-score">
+              <div>
+                <span className="score-number">
+                  {riskScore !== null ? riskScore.toFixed(1) : "-"}
+                </span>
+                <span className="score-unit">/ 100</span>
+              </div>
+              <span className="risk-level">{verdictView.label}</span>
+            </div>
+
+            <div className="risk-info">
+              <p className="risk-label">최종 위험도</p>
+              <h3>{verdictView.label} ({verdictView.term} 판정)</h3>
+              <p>
+                {confidence !== null
+                  ? `판정 신뢰도: ${Math.round(confidence)}%`
+                  : "판정 신뢰도 정보가 없습니다."}
+              </p>
+              <p>{basisText}</p>
+              <p>
+                점수 기준: 30점 미만 안전, 30~59점 주의, 60점 이상 위험
+              </p>
+            </div>
           </div>
+        </DetailCard>
 
-          <span className="risk-level">
-            {levelView.label}
-          </span>
-        </div>
+        {data.explanation && (
+          <DetailCard title="URL에서 모델이 주목한 부분" summary="글자별 위험 기여도">
+            <ModelExplanation
+              explanation={data.explanation}
+              allowlisted={Boolean(data.allowlist?.matched)}
+            />
+          </DetailCard>
+        )}
 
-        <div className="risk-info">
-          <p className="risk-label">
-            최종 위험도
-          </p>
-
-          <h3>
-            {verdictView.label}
-          </h3>
-
-          <p>
-            {confidence !== null
-              ? `판정 신뢰도: ${Math.round(confidence)}%`
-              : "판정 신뢰도 정보가 없습니다."}
-          </p>
-
-          <p>{basisText}</p>
-        </div>
-      </div>
-
-      {/* 판단 근거 수치: 모델이 URL의 어느 부분 때문에 위험하다고 봤는지 */}
-      <ModelExplanation
-        explanation={data.explanation}
-        allowlisted={Boolean(data.allowlist?.matched)}
-      />
-
-      {/* Blacklist */}
-      <div className="result-section">
-        <div className="section-heading">
-          <div>
-            <p>블랙리스트 조회</p>
-          </div>
-
-          <span>KISA</span>
-        </div>
-
+        <DetailCard
+          title="KISA 피싱 사이트 목록 조회"
+          summary={blacklisted ? "목록과 일치" : "일치하지 않음"}
+        >
         <div className="assistant-card">
           <div className="finding">
             <div
@@ -286,23 +276,9 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
             </div>
           </div>
         </div>
-      </div>
+        </DetailCard>
 
-      {/* Detection */}
-      <div className="result-section">
-        <div className="section-heading">
-          <div>
-            <p>탐지 결과</p>
-          </div>
-
-          <span>
-            {detectionEntries.length}개 항목
-            {suspiciousDetectionCount > 0
-              ? ` 중 의심 ${suspiciousDetectionCount}개`
-              : ""}
-          </span>
-        </div>
-
+        <DetailCard title="항목별 탐지 결과" summary={detectionSummary}>
         <div className="detection-list">
           {detectionEntries.length > 0 ? (
             detectionEntries.map(
@@ -408,24 +384,9 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
             </div>
           )}
         </div>
-      </div>
+        </DetailCard>
 
-      {/* Similar Cases */}
-      <div className="result-section">
-        <div className="section-heading">
-          <div>
-            <p>유사 사례</p>
-          </div>
-
-          <span>
-            {similarCases.length > 0
-              ? `피싱 ${similarPhishingCount}건 · 정상 ${
-                  similarCases.length - similarPhishingCount
-                }건`
-              : "RAG"}
-          </span>
-        </div>
-
+        <DetailCard title="비슷한 과거 사례" summary={similarSummary}>
         <div className="assistant-card">
           {similarCases.length > 0 ? (
             similarCases.map(
@@ -481,21 +442,9 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
             </p>
           )}
         </div>
-      </div>
+        </DetailCard>
 
-      {/* ② RAG 대응 가이드 + ③ LLM 출처 있는 설명 (① ML 근거는 위 "판단 근거 수치") */}
-      <GroundedAnalysis ai={data.ai_analysis} rag={data.rag} />
-
-      {/* Model */}
-      <div className="result-section">
-        <div className="section-heading">
-          <div>
-            <p>ML 모델</p>
-          </div>
-
-          <span>Machine Learning</span>
-        </div>
-
+        <DetailCard title="ML 모델" summary={modelLabel}>
         <div className="assistant-card">
           <div className="finding">
             <div
@@ -560,21 +509,10 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
             </div>
           </div>
         </div>
-      </div>
+        </DetailCard>
 
-      {/* Extracted Features */}
-      {data.extracted_features &&
-        Object.keys(data.extracted_features)
-          .length > 0 && (
-          <div className="result-section">
-            <div className="section-heading">
-              <div>
-                <p>추출된 특징</p>
-              </div>
-
-              <span>Features</span>
-            </div>
-
+        {hasFeatures && (
+          <DetailCard title="추출된 URL 특징" summary="모델 입력값">
             <div className="assistant-card">
               {Object.entries(
                 data.extracted_features
@@ -600,8 +538,16 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
                 </div>
               ))}
             </div>
-          </div>
+          </DetailCard>
         )}
+      </div>
+
+      {/* ③ 결과 관리: 공개 범위·공유 링크, 리포트, 삭제 */}
+      {data.viewer && !unsaved && (
+        <div className="result-manage">
+          <ShareControls result={data} onChange={onResultChange} />
+        </div>
+      )}
 
       {/* Report: 리포트 생성, PDF 보기·저장. 다른 분석 결과로 바뀌면 key로 상태를 초기화한다 */}
       {data.id && !unsaved && <ReportSection key={data.id} analysisId={data.id} shareToken={shareToken} />}
