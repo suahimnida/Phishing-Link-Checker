@@ -204,4 +204,53 @@ def to_detection(info: dict) -> dict | None:
     checked = [x for x in (rdap, ct, hosting) if x["status"] not in ("error", "skipped")]
     status = "suspicious" if reasons else ("normal" if checked else "not_analyzed")
     notes.append("평판 신호는 참고 근거이며 최종 점수에는 반영하지 않습니다.")
-    return {"status": status, "reasons": reasons, "notes": notes}
+    return {"status": status, "reasons": reasons, "notes": notes, "checks": _checks(info)}
+
+
+def _check(key: str, label: str, source: str, state: str, value: str) -> dict:
+    return {"key": key, "label": label, "source": source, "state": state, "value": value}
+
+
+def _checks(info: dict) -> list[dict]:
+    """결과 화면의 '접속하지 않고 확인한 정보' 목록.
+
+    state: ok(확인함) / warn(확인했고 의심 신호) / none(확인했지만 기록 없음) / skipped(건너뜀) / failed(조회 실패)
+    모두 사이트가 아닌 공개 기록 서비스에 물어본 결과다.
+    """
+    rdap, ct, hosting = info["rdap"], info["ct"], info["hosting"]
+    items = []
+
+    if rdap["status"] == "ok":
+        days = rdap["age_days"]
+        state = "warn" if days <= NEW_DOMAIN_DAYS else "ok"
+        age = f"{days}일 전" if days < 365 else f"약 {days // 365}년 전"
+        items.append(_check("domain_age", "주소를 만든 날짜", "도메인 등록 정보(RDAP)", state, f"{rdap['created']} ({age})"))
+    elif rdap["status"] == "skipped":
+        items.append(_check("domain_age", "주소를 만든 날짜", "도메인 등록 정보(RDAP)", "skipped",
+                            "누구나 하위 주소를 만드는 서비스이거나 IP 주소라 확인하지 않았어요"))
+    elif rdap["status"] == "not_found":
+        items.append(_check("domain_age", "주소를 만든 날짜", "도메인 등록 정보(RDAP)", "warn", "등록 정보가 없어요"))
+    else:
+        items.append(_check("domain_age", "주소를 만든 날짜", "도메인 등록 정보(RDAP)", "failed", "확인하지 못했어요"))
+
+    if ct["status"] == "ok":
+        state = "warn" if ct["age_days"] <= NEW_DOMAIN_DAYS else "ok"
+        items.append(_check("certificate", "보안 인증서 기록", "인증서 투명성 로그(crt.sh)", state,
+                            f"처음 발급 {ct['first_issued']}, 기록 {ct['count']}건"))
+    elif ct["status"] == "none":
+        items.append(_check("certificate", "보안 인증서 기록", "인증서 투명성 로그(crt.sh)", "none", "발급 기록이 없어요"))
+    elif ct["status"] == "skipped":
+        items.append(_check("certificate", "보안 인증서 기록", "인증서 투명성 로그(crt.sh)", "skipped", "확인하지 않았어요"))
+    else:
+        items.append(_check("certificate", "보안 인증서 기록", "인증서 투명성 로그(crt.sh)", "failed", "확인하지 못했어요"))
+
+    if hosting["status"] == "ok":
+        where = " ".join(x for x in (hosting.get("country"), hosting.get("as_name")) if x)
+        items.append(_check("hosting", "서버 위치와 호스팅 업체", "DNS·IP 소유 정보", "ok", where or f"IP {hosting['ip']}"))
+    elif hosting["status"] == "nxdomain":
+        items.append(_check("hosting", "서버 위치와 호스팅 업체", "DNS·IP 소유 정보", "warn", "주소가 DNS에 존재하지 않아요"))
+    elif hosting["status"] == "no_address":
+        items.append(_check("hosting", "서버 위치와 호스팅 업체", "DNS·IP 소유 정보", "none", "연결된 서버 주소가 없어요"))
+    else:
+        items.append(_check("hosting", "서버 위치와 호스팅 업체", "DNS·IP 소유 정보", "failed", "확인하지 못했어요"))
+    return items

@@ -4,6 +4,8 @@ from pathlib import Path
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from app.services import findings
+
 _PATH = Path(__file__).resolve().parents[2] / "resources" / "guides" / "guides.json"
 
 TAG_LABELS = {
@@ -97,7 +99,10 @@ def build_evidence(*, verdict, risk_score, blacklist, allowlist, model, explanat
             for reason in item.get("reasons", [])[:2]:
                 if shortener and "단축 URL" in reason:
                     continue
-                add(f"탐지 결과 · {title}", reason, False)
+                # 학습 데이터 비교 수치를 근거 문장 안에 넣는다. 설명(LLM)은 근거에 있는 숫자만 쓸 수 있으므로
+                # 이렇게 넣어 둔 수치만 인용할 수 있다 (check_citations)
+                stat = findings.stat_sentence(reason)
+                add(f"탐지 결과 · {title}", f"{reason} {stat}" if stat else reason, False)
 
     # 공식 도메인은 유사 사례를 근거로 쓰지 않는다 (정상 판정과 반대되는 인상을 주므로)
     if similar_cases and not allowlisted:

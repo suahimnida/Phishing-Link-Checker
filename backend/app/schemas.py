@@ -154,6 +154,8 @@ class AnalysisResponse(BaseModel):
     explanation: dict | None = None 
     rag: RagReference = RagReference() 
     model: ModelResult 
+    # 탐지 특징을 쉬운 말로 바꾼 설명 (제목·이유·피해·학습 데이터 비교). 저장하지 않고 응답할 때마다 계산한다
+    findings: list[dict] = []
 
 
 class AnalysisSummary(BaseModel):
@@ -247,3 +249,21 @@ class VisibilityRequest(BaseModel):
 
 class ShareResponse(BaseModel):
     token: str | None = None 
+
+
+class ResponseAction(BaseModel):
+    id: str
+    title: str
+    steps: list[str]
+
+
+class ResponseSituation(BaseModel):
+    id: str
+    label: str
+    actions: list[ResponseAction]
+    contacts: list[ReportContact]
+
+
+class ResponseGuide(BaseModel):
+    """'이미 눌렀다면?' 안내. 리포트의 조치·연락처와 같은 데이터를 쓴다."""
+    situations: list[ResponseSituation]

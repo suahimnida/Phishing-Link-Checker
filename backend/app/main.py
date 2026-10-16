@@ -54,6 +54,7 @@ from app.schemas import (
     ModelResult,
     RagReference,
     ReportResponse,
+    ResponseGuide,
     DeleteAnalysisRequest,
     OwnerCheckRequest,
     ShareResponse,
@@ -63,6 +64,7 @@ from app.services import (
     allowlist,
     blacklist,
     explain,
+    findings,
     guides,
     homograph,
     owner,
@@ -73,6 +75,7 @@ from app.services import (
     rag,
     report,
     report_pdf,
+    response_guide,
     verdict,
 )
 from app.services.llm_openai import OpenAIJsonClient
@@ -253,6 +256,7 @@ def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = He
             source=[f"{g['title']} ({g['source']})" for g in found],
         ),
         model=model_result,
+        findings=findings.explain(detection_result),
     )
 
     owner_row = None
@@ -268,6 +272,15 @@ def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = He
     result.viewer = "owner"
     logger.info("분석 완료: %.2f초, 판정 %s, 설명 %s", time.perf_counter() - started, result.verdict, ai_analysis.written_by)
     return result
+
+
+_RESPONSE_GUIDE = response_guide.build()
+
+
+@app.get("/api/v1/response-guide", response_model=ResponseGuide)
+def read_response_guide():
+    """결과 화면의 '이미 눌렀다면?' 상황별 조치와 연락처. 분석 결과와 관계없는 고정 안내다."""
+    return _RESPONSE_GUIDE
 
 
 @app.get("/api/v1/analyses", response_model=AnalysisListResponse)
@@ -295,6 +308,8 @@ def read_analysis(analysis_id: str, x_client_id: uuid.UUID | None = Header(None)
 
 def _for_viewer(result: AnalysisResponse, viewer: str) -> AnalysisResponse:
     result.viewer = viewer
+    # 쉬운 설명은 저장된 탐지 결과로 매번 다시 만든다. 이 기능 전에 저장된 기록에도 같은 설명이 나온다
+    result.findings = findings.explain(result.detections)
 
     result.share_token = db.get_share_token(result.id) if viewer == "owner" else None
     return result
