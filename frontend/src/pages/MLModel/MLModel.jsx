@@ -8,15 +8,6 @@ const features = [
   "검증 세트로 정한 판정 기준점",
 ];
 
-// 학습에서 일부러 뺀 것과 이유
-const excluded = [
-  {
-    title: "https·www 유무",
-    reason:
-      "기존 학습 데이터의 정상 URL이 모두 https://www. 형태라, 넣으면 모델이 형태만 보고 판단하는 지름길을 배웁니다.",
-  },
-];
-
 function MLModel() {
   return (
     <section className="ml-model-page">
@@ -67,24 +58,6 @@ function MLModel() {
                 {String(index + 1).padStart(2, "0")}
               </span>
               <strong>{feature}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="ml-section">
-        <div className="ml-section-header">
-          <div>
-            <p className="ml-model-eyebrow">NOT USED</p>
-            <h3>학습에서 뺀 것</h3>
-          </div>
-        </div>
-
-        <div className="ml-feature-grid">
-          {excluded.map((item) => (
-            <div className="ml-feature-card" key={item.title}>
-              <strong>{item.title}</strong>
-              <p>{item.reason}</p>
             </div>
           ))}
         </div>

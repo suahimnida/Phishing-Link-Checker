@@ -498,27 +498,6 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
             </div>
 
             <div>
-              <h4>모델 위험도 점수</h4>
-
-              <p>
-                {data.model?.risk_score !==
-                  null &&
-                data.model?.risk_score !==
-                  undefined
-                  ? `${data.model.risk_score} / 100${modelReferenceOnly ? " (참고용)" : ""}`
-                  : blacklisted
-                  ? "생략 (블랙리스트 확정)"
-                  : "계산하지 못했습니다."}
-              </p>
-            </div>
-          </div>
-
-          <div className="finding">
-            <div className="finding-icon normal">
-              ✓
-            </div>
-
-            <div>
               <h4>모델 판정</h4>
 
               <p>
@@ -532,7 +511,7 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
         </DetailCard>
 
         {hasFeatures && (
-          <DetailCard title="추출된 URL 특징" summary="모델 입력값">
+          <DetailCard title="URL 특징(참고용)">
             <div className="assistant-card">
               {Object.entries(
                 data.extracted_features
