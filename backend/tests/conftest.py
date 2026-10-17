@@ -36,3 +36,13 @@ def temp_db(tmp_path, monkeypatch):
         monkeypatch.delenv("DATABASE_URL", raising=False)
         monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
         db.init_db()
+
+
+@pytest.fixture(autouse=True)
+def empty_explanation_cache():
+    # 설명 캐시는 서버 메모리에 남으므로, 테스트끼리 서로의 설명을 재사용하지 않게 비운다
+    from app.services import rag
+
+    rag._explain_cache.clear()
+    yield
+    rag._explain_cache.clear()

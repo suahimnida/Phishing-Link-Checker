@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.schemas import AnalysisResponse, FollowupResult
+from app.services.privacy import mask_url
 
 logger = logging.getLogger(__name__)
 
@@ -249,5 +250,5 @@ def research(analysis: AnalysisResponse, client=None) -> FollowupResult:
             generated_by=client.model,
         )
     except Exception:
-        logger.exception("후속 조치 조사 실패, 기본 조치로 대신합니다: %s", analysis.url)
+        logger.exception("후속 조치 조사 실패, 기본 조치로 대신합니다: %s", mask_url(analysis.url))
         return _template(analysis)

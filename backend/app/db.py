@@ -3,7 +3,7 @@ import secrets
 import os
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -114,6 +114,27 @@ def init_db() -> None:
             )
             """
         )
+
+        # 결과 화면의 '이 판정이 틀렸나요?' 신고. 자동으로 반영하지 않고 사람이 검토한다 (status)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback (
+                id          TEXT PRIMARY KEY,
+                analysis_id TEXT NOT NULL,
+                client_id   TEXT NOT NULL,
+                url         TEXT NOT NULL,
+                verdict     TEXT,
+                claim       TEXT NOT NULL,
+                comment     TEXT,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                created_at  TEXT NOT NULL,
+                reviewed_at TEXT,
+                review_note TEXT,
+                UNIQUE (analysis_id, client_id)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback (status, created_at)")
 
         conn.execute(
             """
@@ -324,9 +345,83 @@ def get_owner(analysis_id: str) -> dict | None:
 
 def delete_analysis(analysis_id: str) -> None:
     with _connect() as (conn, p):
-        for table, column in (("reports", "analysis_id"), ("shares", "analysis_id"), ("owners", "analysis_id"),
-                              ("owner_failures", "analysis_id"), ("analyses", "id")):
+        for table, column in _ANALYSIS_TABLES:
             conn.execute(f"DELETE FROM {table} WHERE {column} = {p}", (analysis_id,))
+
+
+# 분석 하나에 딸린 기록들. 삭제·보관 기간 정리 때 함께 지운다 (분석 기록은 마지막)
+_ANALYSIS_TABLES = (
+    ("reports", "analysis_id"), ("shares", "analysis_id"), ("owners", "analysis_id"),
+    ("owner_failures", "analysis_id"), ("feedback", "analysis_id"), ("analyses", "id"),
+)
+
+
+def purge_older_than(days: int) -> int:
+    """보관 기간이 지난 분석 기록과 딸린 기록(리포트·공유 링크·본인 확인·신고)을 지운다. 지운 분석 수를 돌려준다.
+
+    created_at은 UTC ISO 문자열이라 문자열 비교로 시간 순서를 비교할 수 있다.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    with _connect() as (conn, p):
+        ids = [r["id"] for r in conn.execute(f"SELECT id FROM analyses WHERE created_at < {p}", (cutoff,)).fetchall()]
+        for analysis_id in ids:
+            for table, column in _ANALYSIS_TABLES:
+                conn.execute(f"DELETE FROM {table} WHERE {column} = {p}", (analysis_id,))
+    return len(ids)
+
+
+# ---------- 판정 오류 신고 ----------
+
+def save_feedback(item: dict) -> bool:
+    """신고를 저장한다. 같은 사용자가 같은 분석에 이미 신고했으면 저장하지 않고 False."""
+    with _connect() as (conn, p):
+        exists = conn.execute(
+            f"SELECT 1 FROM feedback WHERE analysis_id = {p} AND client_id = {p}",
+            (item["analysis_id"], item["client_id"]),
+        ).fetchone()
+        if exists:
+            return False
+        conn.execute(
+            f"INSERT INTO feedback (id, analysis_id, client_id, url, verdict, claim, comment, status, created_at) "
+            f"VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, 'pending', {p})",
+            (item["id"], item["analysis_id"], item["client_id"], item["url"], item["verdict"],
+             item["claim"], item["comment"], datetime.now(timezone.utc).isoformat()),
+        )
+    return True
+
+
+def has_feedback(analysis_id: str, client_id: str) -> bool:
+    with _connect() as (conn, p):
+        return conn.execute(
+            f"SELECT 1 FROM feedback WHERE analysis_id = {p} AND client_id = {p}", (analysis_id, client_id)
+        ).fetchone() is not None
+
+
+def count_recent_feedback(client_id: str, since_iso: str) -> int:
+    with _connect() as (conn, p):
+        row = conn.execute(
+            f"SELECT COUNT(*) AS n FROM feedback WHERE client_id = {p} AND created_at >= {p}", (client_id, since_iso)
+        ).fetchone()
+    return int(row["n"])
+
+
+def list_feedback(status: str = "pending", limit: int = 50) -> list[dict]:
+    with _connect() as (conn, p):
+        rows = conn.execute(
+            f"SELECT id, analysis_id, url, verdict, claim, comment, status, created_at, review_note FROM feedback "
+            f"WHERE status = {p} ORDER BY created_at LIMIT {p}",
+            (status, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def review_feedback(feedback_id: str, status: str, note: str | None) -> bool:
+    with _connect() as (conn, p):
+        cur = conn.execute(
+            f"UPDATE feedback SET status = {p}, review_note = {p}, reviewed_at = {p} WHERE id = {p} AND status = 'pending'",
+            (status, note, datetime.now(timezone.utc).isoformat(), feedback_id),
+        )
+        return cur.rowcount > 0
 
 
 # ---------- 본인 확인 실패 기록 ----------

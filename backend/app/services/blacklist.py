@@ -9,6 +9,10 @@ from app.schemas import BlacklistResult
 from app.services.shorteners import is_shortener_host
 
 SOURCE = "KISA 2024"
+# KISA 공개 목록의 기준일. 결과 화면에 표시해 목록이 언제 기준인지 알린다
+SOURCE_DATE = "2024-12-31"
+# 사용자 신고를 사람이 검토해 추가한 주소
+REVIEWED_SOURCE = "검토된 사용자 신고"
 _DEFAULT_DIR = Path(__file__).resolve().parents[2] / "resources" / "blacklist"
 
 
@@ -66,15 +70,64 @@ def _extract_host(url: str) -> str:
     return host.lower().strip(".")
 
 
+def _read_list(name: str) -> list[str]:
+    """exclusions.txt / additions.txt: 한 줄에 하나, '#' 뒤는 설명."""
+    try:
+        lines = (_data_dir() / name).read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return []
+    return [line.split("#", 1)[0].strip().lower() for line in lines if line.split("#", 1)[0].strip()]
+
+
+@lru_cache(maxsize=1)
+def load_reviewed() -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """사람이 검토한 예외(호스트)와 자체 추가 목록(정확한 주소, 호스트)."""
+    exclusions = frozenset(_clean_host(h) for h in _read_list("exclusions.txt"))
+    added = [_normalize_url(u) for u in _read_list("additions.txt")]
+    return exclusions, frozenset(u for u in added if "/" in u), frozenset(u for u in added if "/" not in u)
+
+
+def is_shared_host(host: str) -> bool:
+    """여러 사람·기관이 함께 쓰는 주소라 호스트 하나로 피싱을 확정하면 안 되는지.
+
+    KISA 목록에는 'pf.kakao.com'(카카오톡 채널 전체), 'www.nhis.or.kr'(국민건강보험공단 공식 사이트)처럼
+    사칭 대상이나 플랫폼 주소가 호스트 단위로 섞여 있어, 정상 사이트가 피싱 확정되는 문제가 있었다 (2026-10-16 점검).
+    - 공식 도메인 목록(allowlist)에 있는 도메인의 주소 (pf.kakao.com, line.me, m.site.naver.com 등)
+    - 플랫폼 주소 자체 (t.me, wa.me). 단 'abc.netlify.app'처럼 공격자가 만든 하위 주소는 해당하지 않는다
+    - 사람이 검토해 exclusions.txt에 적은 주소
+    """
+    from app.services import allowlist  # allowlist가 shorteners를 불러오므로 함수 안에서 불러 순환을 피한다
+
+    if not host:
+        return False
+    if host in load_reviewed()[0]:
+        return True
+    if host in allowlist.USER_CONTENT:
+        return True
+    if allowlist._is_user_content(host):
+        return False
+    return allowlist.registered_domain(host) in allowlist.domains()
+
+
 def check_blacklist(url: str) -> BlacklistResult:
     urls, hosts = load_blacklist()
-
-    if _normalize_url(url) in urls:
-        return BlacklistResult(matched=True, match_type="exact", source=SOURCE)
-
+    _, added_urls, added_hosts = load_reviewed()
+    normalized = _normalize_url(url)
     host = _extract_host(url)
-    # 단축 URL 도메인은 호스트 단위로 확정하지 않는다 (shorteners.py 설명 참고)
-    if host in hosts and not is_shortener_host(host):
-        return BlacklistResult(matched=True, match_type="host", source=SOURCE)
+    shared = is_shared_host(host)
 
+    # 경로까지 정확히 일치하면 확정한다. 공용 주소라도 신고된 그 페이지는 피싱이다.
+    # 다만 공용 주소의 '경로 없는 주소'(www.nhis.or.kr 등)는 사칭 대상이 목록에 들어간 경우라 확정하지 않는다
+    has_path = "/" in normalized
+    if normalized in added_urls:
+        return BlacklistResult(matched=True, match_type="exact", source=REVIEWED_SOURCE)
+    if normalized in urls and (has_path or not shared):
+        return BlacklistResult(matched=True, match_type="exact", source=SOURCE)
+    # 공용 주소와 단축 URL 도메인은 호스트 단위로 확정하지 않는다 (shorteners.py 설명 참고)
+    if shared or is_shortener_host(host):
+        return BlacklistResult(matched=False, match_type="none", source=SOURCE)
+    if host in added_hosts:
+        return BlacklistResult(matched=True, match_type="host", source=REVIEWED_SOURCE)
+    if host in hosts:
+        return BlacklistResult(matched=True, match_type="host", source=SOURCE)
     return BlacklistResult(matched=False, match_type="none", source=SOURCE)

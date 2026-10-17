@@ -14,6 +14,7 @@ from app.schemas import (
     ReportResponse,
 )
 from app.services.guides import guide_for_action
+from app.services.privacy import mask_url
 from app.services.followup import (
     ACTIONS,
     DETECTION_KO,
@@ -305,6 +306,6 @@ def generate_report(
                 raise ValueError("summary 또는 risk_assessment가 비어 있습니다")
             return _assemble(analysis, evidence, text, followup, client.model, analyzed_at)
         except Exception:
-            logger.exception("리포트 작성 실패, 템플릿으로 대신합니다: %s", analysis.url)
+            logger.exception("리포트 작성 실패, 템플릿으로 대신합니다: %s", mask_url(analysis.url))
 
     return _assemble(analysis, evidence, _template_text(analysis, evidence, followup), followup, "template", analyzed_at)

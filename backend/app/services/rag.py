@@ -1,14 +1,18 @@
+import hashlib
 import json
 import logging
 import os
 import re
 import sys
+import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from app.schemas import RagReference, SimilarCase
+from app.services.privacy import mask_url
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +197,7 @@ def similar(url: str) -> RagResult:
         features = _state["search_features"](url)
         cases = _retrieve(features)
     except Exception:
-        logger.exception("유사 사례 검색 실패: %s", url)
+        logger.exception("유사 사례 검색 실패: %s", mask_url(url))
         return RagResult()
     return RagResult(
         features=features,
@@ -213,6 +217,39 @@ def _clean(text: str) -> str:
     return re.sub(r"\(\s*\)|\s{2,}", " ", text).strip()
 
 
+# ---------- 설명 캐시 ----------
+# 검증(check_citations)을 통과한 설명만 저장한다. 서버 메모리에만 두며 재시작하면 비워진다.
+EXPLAIN_CACHE_SECONDS = 24 * 3600
+EXPLAIN_CACHE_MAX = 500
+_explain_cache: "OrderedDict[str, tuple[float, str]]" = OrderedDict()
+_explain_lock = threading.Lock()
+_cache_stats = {"hit": 0, "miss": 0}
+
+
+def _cache_get(key: str) -> str | None:
+    with _explain_lock:
+        item = _explain_cache.get(key)
+        if item is None:
+            return None
+        if time.time() - item[0] > EXPLAIN_CACHE_SECONDS:
+            del _explain_cache[key]
+            return None
+        _explain_cache.move_to_end(key)
+        return item[1]
+
+
+def _cache_put(key: str, text: str) -> None:
+    with _explain_lock:
+        _explain_cache[key] = (time.time(), text)
+        _explain_cache.move_to_end(key)
+        while len(_explain_cache) > EXPLAIN_CACHE_MAX:
+            _explain_cache.popitem(last=False)
+
+
+def cache_stats() -> dict:
+    return {**_cache_stats, "size": len(_explain_cache)}
+
+
 def compose(evidence: list[dict], guides: list[dict]) -> str | None:
     from app.services.guides import check_citations
 
@@ -223,6 +260,15 @@ def compose(evidence: list[dict], guides: list[dict]) -> str | None:
     facts += "\n\n[대응 가이드]\n" + "\n".join(
         f"[{g['id']}] {g['title']} - {_clean(g['text'])} (출처: {g['source']})" for g in guides
     )
+    # 같은 근거·가이드 조합이면 이전 설명을 재사용한다 (호출 비용·대기 시간 절감).
+    # 키는 URL이 아니라 근거 문장의 해시라, 개인정보가 담길 수 있는 URL 자체를 들고 있지 않는다
+    key = hashlib.sha256((CLAUDE_MODEL + "\n" + facts).encode("utf-8")).hexdigest()
+    cached = _cache_get(key)
+    if cached is not None:
+        _cache_stats["hit"] += 1
+        logger.info("Claude 설명 캐시 사용 (적중 %s회, 호출 %s회)", _cache_stats["hit"], _cache_stats["miss"])
+        return cached
+    _cache_stats["miss"] += 1
     started = time.perf_counter()
     try:
         response = client.messages.create(
@@ -240,7 +286,9 @@ def compose(evidence: list[dict], guides: list[dict]) -> str | None:
             getattr(usage, "input_tokens", "?"), getattr(usage, "output_tokens", "?"),
         )
         text = "".join(b.text for b in response.content if b.type == "text")
-        return check_citations(text, evidence, guides)
+        checked = check_citations(text, evidence, guides)
+        _cache_put(key, checked)
+        return checked
     except ValueError as error:
         # 출처 검사에서 걸린 경우: 어떤 규칙에 걸렸는지 한 줄로 남긴다 (템플릿 원인 확인용)
         logger.warning("Claude 설명이 출처 검사에서 거절되어 템플릿으로 대신합니다: %s", error)

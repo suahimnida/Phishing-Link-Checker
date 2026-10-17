@@ -19,6 +19,8 @@ KISA_2024 = DATA / "한국인터넷진흥원_피싱사이트_20241231.csv"
 PUBLIC = DATA / "public_url_dataset.csv"
 PUBLIC_URL = "https://raw.githubusercontent.com/faizann24/Using-machine-learning-to-detect-malicious-URLs/master/data/data.csv"
 EVAL_SET = ROOT / "evaluation" / "eval_set.csv"
+# 사용자 신고를 사람이 검토해 정답을 정한 URL (scripts/review_feedback.py가 쌓는다)
+FEEDBACK = DATA / "feedback_labels.csv"
 
 SCHEMES = (("https://", 0.45), ("http://", 0.25), ("", 0.30))
 
@@ -68,6 +70,17 @@ def cap_per_domain(df: pd.DataFrame, cap: int, seed: int) -> pd.DataFrame:
     return df[df.groupby("domain").cumcount() < cap]
 
 
+def load_feedback(eval_domains: set) -> pd.DataFrame:
+    """검토를 거친 신고 라벨. 평가 세트와 같은 도메인은 빼서 평가가 부풀지 않게 한다."""
+    if not FEEDBACK.exists():
+        return pd.DataFrame(columns=["url", "label", "source", "domain"])
+    fb = pd.read_csv(FEEDBACK)
+    fb["url"] = fb["url"].astype(str).str.strip()
+    fb["source"] = "사용자 신고(검토)"
+    fb["domain"] = [registered_domain(split_url(u)["host"]) for u in fb.url]
+    return fb[~fb.domain.isin(eval_domains)][["url", "label", "source", "domain"]]
+
+
 def main():
     parser = argparse.ArgumentParser(description="편향을 고친 학습 데이터 만들기")
     parser.add_argument("--per-class", type=int, default=100_000, help="라벨별 최대 건수")
@@ -102,6 +115,11 @@ def main():
     df["url"] = [
         reform(u, rng, strip_path=(lab == 1 and rng.random() < 0.25)) for u, lab in zip(df.url, df.label)
     ]
+    feedback = load_feedback(eval_domains)
+    if len(feedback):
+        # 검토된 신고는 표본 추출 없이 모두 넣고, 같은 URL의 기존 라벨보다 우선한다
+        df = pd.concat([feedback, df[~df.url.isin(feedback.url)]], ignore_index=True)
+        print(f"검토된 사용자 신고: {len(feedback)}건 추가")
     df = df.drop_duplicates("url").sample(frac=1, random_state=args.seed)
 
     out = DATA / "train_v2.csv"

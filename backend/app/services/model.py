@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from app.schemas import ModelResult
+from app.services.privacy import mask_url
 
 logger = logging.getLogger(__name__)
 
@@ -18,5 +19,5 @@ def predict(url: str) -> ModelResult:
 
         return ModelResult(**predict_model(url))
     except Exception:
-        logger.exception("ML 예측 실패: %s", url)
+        logger.exception("ML 예측 실패: %s", mask_url(url))
         return ModelResult(status="not_ready")

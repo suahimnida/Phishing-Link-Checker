@@ -5,6 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -55,6 +56,8 @@ from app.schemas import (
     RagReference,
     ReportResponse,
     ResponseGuide,
+    FeedbackRequest,
+    FeedbackResponse,
     DeleteAnalysisRequest,
     OwnerCheckRequest,
     ShareResponse,
@@ -68,6 +71,7 @@ from app.services import (
     guides,
     homograph,
     owner,
+    privacy,
     reputation,
     detections,
     followup,
@@ -92,6 +96,29 @@ def _model_info() -> dict:
         return {}
 
 
+_purge_lock = threading.Lock()
+_last_purge = 0.0
+
+
+def _purge_expired(force: bool = False) -> None:
+    """보관 기간이 지난 분석 기록을 지운다. 서버 시작 때와, 이후 하루에 한 번(분석 요청 때) 실행한다."""
+    global _last_purge
+    now = time.time()
+    if not force and now - _last_purge < 24 * 3600:
+        return
+    if not _purge_lock.acquire(blocking=False):
+        return
+    try:
+        _last_purge = now
+        removed = db.purge_older_than(privacy.RETENTION_DAYS)
+        if removed:
+            logger.info("보관 기간(%s일)이 지난 분석 기록 %s건을 지웠습니다", privacy.RETENTION_DAYS, removed)
+    except Exception:
+        logger.exception("보관 기간 정리 실패")
+    finally:
+        _purge_lock.release()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     started = time.perf_counter()
@@ -102,6 +129,7 @@ async def lifespan(app: FastAPI):
         logger.exception("DB 연결 실패: %s", db.describe())
         raise
     logger.info("분석 기록 저장소: %s", db.describe())
+    _purge_expired(force=True)
     try:
         rag.load_rag()
     except Exception:
@@ -160,12 +188,16 @@ def _llm_status() -> dict:
 
     return {
         "claude": {"configured": configured("ANTHROPIC"), "model": rag.CLAUDE_MODEL,
-                   "loaded": bool((rag._state or {}).get("client"))},
+                   "loaded": bool((rag._state or {}).get("client")),
+                   # 설명 캐시: 적중(hit)이 많을수록 LLM 호출이 줄어든 것이다
+                   "cache": rag.cache_stats()},
         "followup": {"configured": configured("FOLLOWUP_OPENAI"),
                      "model": os.environ.get("FOLLOWUP_OPENAI_MODEL") or followup.DEFAULT_FOLLOWUP_MODEL or None},
         "report": {"configured": configured("REPORT_OPENAI"),
                    "model": os.environ.get("REPORT_OPENAI_MODEL") or report.DEFAULT_REPORT_MODEL or None},
         "database": db.describe().split(" ")[0],
+        "retention_days": privacy.RETENTION_DAYS,
+        "blacklist_date": blacklist.SOURCE_DATE,
         "cors_origins": [o for o in (os.environ.get("CORS_ORIGINS") or "http://localhost:5173").split(",") if o],
     }
 
@@ -193,6 +225,7 @@ REPUTATION_WAIT = float(os.environ.get("REPUTATION_WAIT_SECONDS") or 4)
 @app.post("/api/v1/analyses", response_model=AnalysisResponse)
 def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = Header(None)):
     started = time.perf_counter()
+    _purge_expired()
     blacklist_result = blacklist.check_blacklist(request.url)
     allowlist_result = allowlist.check(request.url)
     shortener = is_shortener_host(blacklist._extract_host(request.url))
@@ -208,13 +241,13 @@ def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = He
     try:
         detection_result = Detections(**detections.analyze(request.url))
     except Exception:
-        logger.exception("탐지 결과 생성 실패: %s", request.url)
+        logger.exception("탐지 결과 생성 실패: %s", privacy.mask_url(request.url))
         detection_result = Detections()
     if reputation_job is not None:
         try:
             detection_result.reputation = reputation.to_detection(reputation_job.result(timeout=REPUTATION_WAIT))
         except Exception:
-            logger.exception("평판 신호 조회 실패: %s", request.url)
+            logger.exception("평판 신호 조회 실패: %s", privacy.mask_url(request.url))
 
     decided = verdict.decide(blacklist_result, model_result, allowlist_result,
                              shortener=shortener, homograph=homograph_result)
@@ -227,7 +260,9 @@ def create_analysis(request: AnalysisRequest, x_client_id: uuid.UUID | None = He
         shortener=shortener, homograph=homograph_result,
     )
     found = guides.retrieve(guides.evidence_tags(request.url, decided["verdict"], evidence), evidence)
-    written = None if blacklist_result.matched else rag.compose(evidence, found)
+    # LLM 설명은 위험·주의 판정에만 쓴다. 정상 판정은 짧은 템플릿 설명으로 충분하고, 호출 비용과 대기 시간을 줄인다
+    needs_llm = not blacklist_result.matched and decided["verdict"] in ("phishing", "suspicious")
+    written = rag.compose(evidence, found) if needs_llm else None
     ai_analysis = AiAnalysis(
         summary=written or guides.template_explanation(decided["verdict"], evidence, found),
         written_by=rag.CLAUDE_MODEL if written else "template",
@@ -408,6 +443,45 @@ def _report_client():
             "REPORT", "리포트 작성", report.DEFAULT_REPORT_MODEL
         )
     return _llm_clients["report"]
+
+
+FEEDBACK_DAILY_LIMIT = 20
+FEEDBACK_MESSAGES = {
+    True: "의견을 보내 주셔서 고마워요. 검토한 뒤 목록과 모델 개선에 반영할게요.",
+    False: "이 결과에는 이미 의견을 보내셨어요.",
+}
+
+
+@app.post("/api/v1/analyses/{analysis_id}/feedback", response_model=FeedbackResponse)
+def send_feedback(
+    analysis_id: str,
+    request: FeedbackRequest,
+    share: str | None = Query(None, description="공유 링크 토큰"),
+    x_client_id: uuid.UUID | None = Header(None),
+):
+    """'이 판정이 틀렸나요?' 신고를 받는다.
+
+    신고는 자동으로 반영하지 않는다. 공격자가 자기 피싱 사이트를 '정상'이라고 반복 신고해
+    허용 목록이나 학습 데이터를 오염시킬 수 있으므로, 모두 '검토 대기'로 저장하고 사람이 검토한다
+    (scripts/review_feedback.py). 같은 사용자는 한 결과에 한 번, 하루 20건까지만 보낼 수 있다.
+    """
+    client_key = _client_key(x_client_id)
+    if client_key is None:
+        raise HTTPException(status_code=400, detail="X-Client-Id 헤더가 필요합니다.")
+    analysis, _ = _report_access(analysis_id, client_key, share)
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    if db.count_recent_feedback(client_key, since) >= FEEDBACK_DAILY_LIMIT:
+        raise HTTPException(status_code=429, detail="오늘은 더 이상 의견을 보낼 수 없어요. 내일 다시 시도해 주세요.")
+    saved = db.save_feedback({
+        "id": str(uuid.uuid4()),
+        "analysis_id": analysis_id,
+        "client_id": client_key,
+        "url": analysis.url,
+        "verdict": analysis.verdict,
+        "claim": request.claim,
+        "comment": request.comment,
+    })
+    return FeedbackResponse(received=saved, message=FEEDBACK_MESSAGES[saved])
 
 
 def _report_access(analysis_id: str, client_key: str | None, share: str | None):

@@ -267,3 +267,27 @@ class ResponseSituation(BaseModel):
 class ResponseGuide(BaseModel):
     """'이미 눌렀다면?' 안내. 리포트의 조치·연락처와 같은 데이터를 쓴다."""
     situations: list[ResponseSituation]
+
+
+FeedbackClaim = Literal["actually_safe", "actually_phishing", "other"]
+
+
+class FeedbackRequest(BaseModel):
+    """'이 판정이 틀렸나요?' 신고. 의견은 선택이며 개인정보를 적지 않도록 화면에서 안내한다."""
+    claim: FeedbackClaim
+    comment: str | None = Field(None, max_length=200)
+
+    @field_validator("comment")
+    @classmethod
+    def comment_clean(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if _CONTROL.sub("", v.replace("\n", " ")) != v.replace("\n", " "):
+            raise ValueError("의견에 제어 문자를 넣을 수 없습니다.")
+        return v or None
+
+
+class FeedbackResponse(BaseModel):
+    received: bool
+    message: str
