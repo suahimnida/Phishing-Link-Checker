@@ -5,7 +5,7 @@ function Header() {
         <div className="logo-mark">P</div>
 
         <div>
-          <h1>피싱 사이트 분석기</h1>
+          <h1>URL 피싱 확률 분석</h1>
           <span>AI 보안 분석</span>
         </div>
       </div>

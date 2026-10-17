@@ -77,7 +77,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
   return (
     <section className="home">
       <div className="home-header">
-        <p className="eyebrow">AI 기반 웹 보안 분석</p>
+        <p className="eyebrow">AI 기반 URL 분석</p>
 
         <h2>
           이 웹사이트,
@@ -86,8 +86,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
         </h2>
 
         <p className="home-description">
-          URL을 입력하면 다양한 보안 지표와 AI 분석을 통해
-          피싱 위험 여부를 확인할 수 있습니다.
+          URL의 피싱 확률 분석부터 보고서까지 한 번에
         </p>
       </div>
 
@@ -102,7 +101,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
               value={ownerName}
               onChange={(event) => setOwnerName(event.target.value)}
               maxLength={30}
-              placeholder="성명을 입력하여 주십시오"
+              placeholder="성명을 입력해주세요."
               autoComplete="name"
             />
             {showErrors && nameError && <small className="field-error">{nameError}</small>}
@@ -114,14 +113,14 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
               value={ownerSecret}
               onChange={(event) => setOwnerSecret(event.target.value)}
               maxLength={12}
-              placeholder="영어와 숫자로 이루어진 개인 식별 암호를 8~12자리로 입력하여 주십시오"
+              placeholder="영어와 숫자로 이루어진 개인 식별 암호 8~12자리 입력해주세요."
               autoComplete="new-password"
             />
             {showErrors && secretError ? (
               <small className="field-error">{secretError}</small>
             ) : (
               <small className="field-help">
-                {ownerSecret.length}자 (8~12자리) · 분석 결과를 삭제할 때 본인 확인에 쓰여요. 꼭 기억해 두세요.
+                {ownerSecret.length}자 (8~12자리) · 분석 결과 삭제 희망 시, 본인 확인 용도로 사용해요.
               </small>
             )}
           </label>
@@ -151,13 +150,12 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
 
         <p className={`input-help ${urlHint && !url.trim() ? "attention" : ""}`} role="status">
           {urlHint && !url.trim()
-            ? "분석할 URL을 입력한 뒤 '분석하기'를 눌러 주세요."
+            ? "URL을 입력한 뒤 '분석하기' 버튼을 눌러주세요."
             : "분석하려는 웹사이트의 URL을 입력해주세요."}
         </p>
 
-        {/* 주소의 '?' 뒤에는 개인정보가 들어 있을 수 있다. 입력한 주소에 '?'가 있으면 눈에 띄게 알린다 */}
-        <p className={`input-help privacy-hint ${url.includes("?") ? "attention" : ""}`}>
-          주소의 '?' 뒤에는 이메일·전화번호 같은 개인정보가 들어 있을 수 있어요. 분석 기록은 90일 동안 보관돼요.
+        <p className="input-help privacy-hint">
+          분석 기록은 최대 90일 동안 '분석 기록'에서 확인할 수 있어요.
         </p>
 
         <div className="visibility-options">
@@ -176,8 +174,8 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
             <div>
               <strong>비공개</strong>
               <span>
-                이 브라우저에서만 볼 수 있습니다. 결과 화면에서 공유 링크를 만들면
-                링크가 있는 사람도 볼 수 있습니다.
+                비공개 시, 해당 브라우저 내에서만 확인이 가능하며, 추후 공개로 전환 혹은 공유 링크를
+                통해 분석 기록을 확인할 수 있어요.
               </span>
             </div>
           </label>
@@ -197,7 +195,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
             <div>
               <strong>공개</strong>
               <span>
-                분석 기록의 '공개 분석'에서 누구나 결과를 볼 수 있습니다.
+                분석 기록의 '공개 분석'에서 누구나 결과를 볼 수 있어요.
               </span>
             </div>
           </label>
@@ -212,7 +210,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
 
           <p>
             URL의 길이, 문자 패턴, 엔트로피 및 n-gram을
-            분석합니다.
+            분석해요.
           </p>
         </div>
 
@@ -223,7 +221,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
 
           <p>
             AI가 탐지 근거와 유사 사례를 바탕으로
-            왜 위험한지 설명하고 리포트를 작성합니다.
+            왜 위험한지 설명하고 리포트를 작성해요.
           </p>
         </div>
 
@@ -234,7 +232,7 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
 
           <p>
             사이트에 접속하지 않고 도메인 등록일, 인증서 기록,
-            호스팅 정보를 확인합니다.
+            호스팅 정보를 확인해요.
           </p>
         </div>
       </div>
