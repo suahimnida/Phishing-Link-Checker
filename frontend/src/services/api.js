@@ -268,3 +268,17 @@ export function getResponseGuide() {
   }
   return responseGuidePromise;
 }
+
+// '이 판정이 틀렸나요?' 신고. claim: actually_safe / actually_phishing / other
+export async function sendFeedback(analysisId, claim, comment, shareToken = null) {
+  const clientId = await getClientId();
+  return request(
+    `/api/v1/analyses/${analysisId}/feedback${shareQuery(shareToken)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client-Id": clientId },
+      body: JSON.stringify({ claim, comment: comment.trim() || null }),
+    },
+    "의견 보내기 실패"
+  );
+}

@@ -1,0 +1,35 @@
+.privacy-notice {
+  margin-top: 36px;
+  padding-top: 18px;
+  border-top: 1px solid #292e2f;
+}
+
+.privacy-notice summary {
+  color: #8a9391;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.privacy-notice summary:focus-visible {
+  outline: 2px solid #42e8c4;
+  outline-offset: 2px;
+}
+
+.privacy-notice dl {
+  max-width: 720px;
+  margin-top: 12px;
+}
+
+.privacy-notice dt {
+  margin-top: 12px;
+  color: #c9d1ce;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.privacy-notice dd {
+  margin-top: 4px;
+  color: #8a9391;
+  font-size: 13px;
+  line-height: 1.65;
+}

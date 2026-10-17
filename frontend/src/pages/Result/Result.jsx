@@ -7,6 +7,8 @@ import QuickVerdict from "../../components/QuickVerdict/QuickVerdict";
 import DetailCard from "../../components/DetailCard/DetailCard";
 import Findings from "../../components/Findings/Findings";
 import Checks from "../../components/Checks/Checks";
+import FeedbackBox from "../../components/Feedback/FeedbackBox";
+import PrivacyNotice from "../../components/PrivacyNotice/PrivacyNotice";
 import { verdictInfo } from "../../utils/verdict";
 import "./Result.css";
 
@@ -172,6 +174,11 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
 
       {/* ① 한눈에 보는 판정: 3단계 판정 + 한 줄 이유 + 지금 할 일 */}
       <QuickVerdict data={data} url={url} />
+
+      {/* 판정 오류 신고: 저장된 결과에만 (신고는 분석 기록에 연결된다) */}
+      {data.id && !unsaved && (
+        <FeedbackBox key={data.id} analysisId={data.id} verdict={data.verdict} shareToken={shareToken} />
+      )}
 
       {/* ② 자세히 보기: 판단 근거는 궁금한 사용자만 펼쳐 본다 */}
       <div className="detail-group">
@@ -570,6 +577,8 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       {data.id && data.is_public && !unsaved && data.viewer !== "shared" && (
         <DeleteSection analysisId={data.id} onDeleted={onDeleted} />
       )}
+
+      <PrivacyNotice />
     </section>
   );
 }

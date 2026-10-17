@@ -155,6 +155,11 @@ function Home({ onAnalyze, onOpenHistory, focusRequest = 0 }) {
             : "분석하려는 웹사이트의 URL을 입력해주세요."}
         </p>
 
+        {/* 주소의 '?' 뒤에는 개인정보가 들어 있을 수 있다. 입력한 주소에 '?'가 있으면 눈에 띄게 알린다 */}
+        <p className={`input-help privacy-hint ${url.includes("?") ? "attention" : ""}`}>
+          주소의 '?' 뒤에는 이메일·전화번호 같은 개인정보가 들어 있을 수 있어요. 분석 기록은 90일 동안 보관돼요.
+        </p>
+
         <div className="visibility-options">
           <label
             className={`visibility-option ${

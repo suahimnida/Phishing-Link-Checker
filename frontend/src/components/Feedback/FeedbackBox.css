@@ -1,0 +1,128 @@
+.feedback-box {
+  margin-top: 14px;
+}
+
+.feedback-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #c9d1ce;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.feedback-toggle:hover {
+  color: #f4f7f6;
+}
+
+.feedback-toggle:focus-visible,
+.feedback-options button:focus-visible,
+.feedback-comment textarea:focus-visible,
+.feedback-submit:focus-visible {
+  outline: 2px solid #42e8c4;
+  outline-offset: 2px;
+}
+
+.feedback-panel {
+  max-width: 640px;
+  margin-top: 12px;
+  padding: 16px 18px;
+  border: 1px solid #292e2f;
+  border-radius: 10px;
+  background: #131617;
+}
+
+.feedback-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feedback-options button {
+  padding: 8px 12px;
+  border: 1px solid #3a4041;
+  border-radius: 999px;
+  background: #0d1011;
+  color: #c9d1ce;
+  font-size: 13px;
+}
+
+.feedback-options button.selected {
+  border-color: #f4f7f6;
+  background: #f4f7f6;
+  color: #0a0c0d;
+  font-weight: 700;
+}
+
+.feedback-comment {
+  display: block;
+  margin-top: 14px;
+}
+
+.feedback-comment > span:first-child {
+  color: #8a9391;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.feedback-comment textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #3a4041;
+  border-radius: 8px;
+  background: #0d1011;
+  color: #f4f7f6;
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.feedback-meta {
+  display: block;
+  margin-top: 4px;
+  color: #8a9391;
+  font-size: 12px;
+}
+
+.feedback-error {
+  margin-top: 10px;
+  color: #ffb84d;
+  font-size: 13px;
+}
+
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.feedback-actions p {
+  color: #8a9391;
+  font-size: 12px;
+}
+
+.feedback-submit {
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #42e8c4;
+  color: #0a0c0d;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.feedback-submit:disabled {
+  background: #2a3031;
+  color: #6f7876;
+  cursor: not-allowed;
+}
+
+.feedback-done {
+  color: #42e8c4;
+  font-size: 14px;
+}

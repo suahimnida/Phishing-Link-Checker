@@ -17,7 +17,10 @@ function Checks({ data }) {
     {
       key: "blacklist",
       label: "신고된 피싱 사이트 목록",
-      source: "KISA 피싱 사이트 URL 공개 데이터",
+      source:
+        data.blacklist?.source === "검토된 사용자 신고"
+          ? "사용자 신고를 검토해 추가한 목록"
+          : "KISA 피싱 사이트 URL 공개 데이터 (2024-12-31 기준, 이후 생긴 사이트는 없을 수 있어요)",
       state: blacklisted ? "warn" : "ok",
       value: blacklisted ? "목록에 있는 주소예요" : "목록에 없어요",
     },
