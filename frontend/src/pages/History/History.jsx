@@ -100,7 +100,7 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
             <h2>분석 기록</h2>
 
             <p className="history-description">
-              이전에 분석한 웹사이트의 결과를 확인할 수 있습니다.
+              분석한 URL에 대한 결과를 확인할 수 있어요.
             </p>
           </div>
         </div>
@@ -126,7 +126,7 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
           <h2>분석 기록</h2>
 
           <p className="history-description">
-            이전에 분석한 웹사이트의 결과를 확인할 수 있습니다.
+            분석한 URL에 대한 결과를 확인할 수 있어요.
           </p>
         </div>
 
@@ -142,8 +142,8 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
       {/* 기록은 브라우저 ID로 찾는다. 브라우저 데이터를 지우거나 다른 기기에서 열면 내 기록이 보이지 않는다 */}
       {tab === "mine" && (
         <p className="history-storage-note">
-          내 기록은 이 브라우저에만 연결되어 있습니다. 브라우저 데이터(사이트 데이터·쿠키)를 지우거나 다른
-          브라우저·기기에서 열면 내 기록이 보이지 않습니다. 공개한 결과는 '공개 분석'에서 계속 볼 수 있습니다.
+          비공개로 설정한 분석 요청은 '내 기록'에서 확인할 수 있으며, 분석을 요청한 브라우저 내에서만 확인
+          가능해요.
         </p>
       )}
 
@@ -171,7 +171,7 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
         </div>
       ) : (
         <div className="history-list">
-          {history.map((item) => {
+          {history.map((item, index) => {
             const riskStatus = getRiskStatus(
               item.verdict
             );
@@ -201,11 +201,8 @@ function History({ onViewResult, initialTab = "mine", notice = "" }) {
                   {/* URL */}
                   <h3>{item.url}</h3>
 
-                  {/* Summary */}
-                  <p>
-                    분석 결과를 확인하려면
-                    결과 보기를 눌러주세요.
-                  </p>
+                  {/* 안내 문구는 맨 위 기록에만 보여 준다 */}
+                  {index === 0 && <p>분석 결과를 확인하려면 '결과 보기'를 눌러주세요.</p>}
                 </div>
 
                 {/* Actions */}

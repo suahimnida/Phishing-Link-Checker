@@ -69,16 +69,16 @@ function FeedbackBox({ analysisId, verdict, shareToken }) {
           </div>
 
           <label className="feedback-comment">
-            <span>더 알려 주실 내용 (선택)</span>
+            <span>의견</span>
             <textarea
               value={comment}
               maxLength={MAX_COMMENT}
               rows={3}
-              placeholder="예: 회사에서 쓰는 공식 사이트예요"
+              placeholder="URL 분석 결과에 대한 의견을 제출할게요."
               onChange={(e) => setComment(e.target.value)}
             />
             <span className="feedback-meta">
-              이름·전화번호 같은 개인정보는 적지 마세요. {comment.length}/{MAX_COMMENT}
+              이름·전화번호 등의 개인정보는 기재하지 말아주세요. {comment.length}/{MAX_COMMENT}
             </span>
           </label>
 
@@ -88,7 +88,7 @@ function FeedbackBox({ analysisId, verdict, shareToken }) {
             <button type="button" className="feedback-submit" disabled={!claim || busy} onClick={submit}>
               {busy ? "보내는 중" : "의견 보내기"}
             </button>
-            <p>보낸 의견은 검토를 거쳐 피싱 목록과 판정 모델 개선에 쓰여요.</p>
+            <p>보내주신 의견은 검토를 거쳐 피싱 목록과 판정 모델 개선에 사용돼요.</p>
           </div>
         </div>
       )}

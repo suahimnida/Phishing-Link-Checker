@@ -118,11 +118,7 @@ function ShareControls({ result, onChange }) {
       <div className="share-row">
         <div>
           <strong>링크가 있는 사람은 볼 수 있음</strong>
-          <p>
-            {result.share_token
-              ? "아래 링크를 받은 사람은 비공개여도 이 결과를 볼 수 있어요."
-              : "공개하지 않고 원하는 사람에게만 결과를 보여 주고 싶을 때 써요."}
-          </p>
+          {result.share_token && <p>아래 링크를 받은 사람은 비공개여도 이 결과를 볼 수 있어요.</p>}
         </div>
         {result.share_token ? (
           <button className="share-secondary" onClick={turnOffLink} disabled={busy}>

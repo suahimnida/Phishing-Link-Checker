@@ -189,7 +189,7 @@ function ReportSection({ analysisId, shareToken = null }) {
 
           <p>
             탐지 결과, 유사 사례, AI 분석 설명을 바탕으로 후속 조치를 조사하고
-            신고 기관까지 정리한 보안 분석 리포트를 생성합니다.
+            신고 기관까지 정리한 보안 분석 리포트를 생성해요.
           </p>
         </div>
 
