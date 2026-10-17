@@ -15,13 +15,13 @@ CONFIRM = "분석 결과를 삭제하겠습니다"
 # 실패 기록은 DB(owner_failures)에 분석 id별로 저장된다. 테스트마다 새 분석을 만들므로 따로 지울 필요가 없다.
 
 
-def analyze(is_public=True, name="김수아", secret=SECRET) -> dict:
+def analyze(is_public=True, name="김수아", secret=SECRET, client_id=None) -> dict:
     body = {"url": "http://secure-login-verify.tk/account", "is_public": is_public}
     if name is not None:
         body["owner_name"] = name
     if secret is not None:
         body["owner_secret"] = secret
-    res = client.post("/api/v1/analyses", json=body, headers={"X-Client-Id": str(uuid.uuid4())})
+    res = client.post("/api/v1/analyses", json=body, headers={"X-Client-Id": client_id or str(uuid.uuid4())})
     assert res.status_code == 200, res.text
     return res.json()
 
@@ -97,10 +97,25 @@ def test_lock_after_repeated_wrong_secrets():
     assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": "김수아", "secret": SECRET}).status_code == 429
 
 
-def test_private_result_cannot_be_deleted_yet():
-    aid = analyze(is_public=False)["id"]
-    res = client.post(f"/api/v1/analyses/{aid}/delete", json={"name": "김수아", "secret": SECRET, "confirm_text": CONFIRM})
-    assert res.status_code == 404
+def test_private_result_can_be_deleted_from_its_browser():
+    cid = str(uuid.uuid4())
+    aid = analyze(is_public=False, client_id=cid)["id"]
+    headers = {"X-Client-Id": cid}
+    assert client.post(f"/api/v1/analyses/{aid}/verify-owner", json={"name": "김수아", "secret": SECRET},
+                       headers=headers).status_code == 200
+    res = client.post(f"/api/v1/analyses/{aid}/delete", json={"name": "김수아", "secret": SECRET, "confirm_text": CONFIRM},
+                      headers=headers)
+    assert res.status_code == 200
+    assert client.get(f"/api/v1/analyses/{aid}", headers=headers).status_code == 404
+
+
+def test_private_result_cannot_be_deleted_from_other_browser():
+    """비공개 결과는 성명·암호를 알아도 다른 브라우저에서는 삭제할 수 없다 (있는지도 알려 주지 않는다)."""
+    aid = analyze(is_public=False, client_id=str(uuid.uuid4()))["id"]
+    body = {"name": "김수아", "secret": SECRET, "confirm_text": CONFIRM}
+    assert client.post(f"/api/v1/analyses/{aid}/delete", json=body).status_code == 404
+    assert client.post(f"/api/v1/analyses/{aid}/delete", json=body,
+                       headers={"X-Client-Id": str(uuid.uuid4())}).status_code == 404
 
 
 def test_analysis_without_owner_info_still_works():

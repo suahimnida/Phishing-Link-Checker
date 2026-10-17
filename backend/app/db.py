@@ -333,12 +333,18 @@ def save_owner(analysis_id: str, masked_name: str | None, secret_hash: str | Non
         )
 
 
-def get_owner(analysis_id: str) -> dict | None:
+def get_owner(analysis_id: str, client_id: str | None = None) -> dict | None:
+    """삭제할 때 본인 확인에 쓸 성명·암호 해시.
+
+    공개 결과는 누구나 삭제 화면을 열 수 있고, 비공개 결과는 분석한 브라우저(client_id)에서만 찾을 수 있다.
+    다른 브라우저에서는 비공개 결과가 있는지조차 알 수 없게 공개 결과가 아닌 것처럼 None을 돌려준다.
+    """
     with _connect() as (conn, p):
         row = conn.execute(
             f"SELECT o.masked_name, o.name_hash, o.secret_hash FROM owners o JOIN analyses a ON a.id = o.analysis_id "
-            f"WHERE o.analysis_id = {p} AND a.is_public = 1 AND o.secret_hash IS NOT NULL",
-            (analysis_id,),
+            f"WHERE o.analysis_id = {p} AND o.secret_hash IS NOT NULL "
+            f"AND (a.is_public = 1 OR (a.client_id IS NOT NULL AND a.client_id = {p}))",
+            (analysis_id, client_id),
         ).fetchone()
     return dict(row) if row else None
 

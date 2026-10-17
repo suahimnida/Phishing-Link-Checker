@@ -380,8 +380,9 @@ def delete_share_link(analysis_id: str, x_client_id: uuid.UUID | None = Header(N
     return ShareResponse(token=None)
 
 
-def _check_owner(analysis_id: str, name: str, secret: str) -> None:
-    stored = db.get_owner(analysis_id)
+def _check_owner(analysis_id: str, name: str, secret: str, client_key: str | None = None) -> None:
+    """분석할 때 입력한 성명·암호로 본인을 확인한다. 비공개 결과는 분석한 브라우저에서만 확인할 수 있다."""
+    stored = db.get_owner(analysis_id, client_key)
     if stored is None:
         raise HTTPException(status_code=404, detail="삭제할 수 있는 분석 결과가 없습니다.")
     if owner.locked(analysis_id):
@@ -394,14 +395,14 @@ def _check_owner(analysis_id: str, name: str, secret: str) -> None:
 
 
 @app.post("/api/v1/analyses/{analysis_id}/verify-owner")
-def verify_owner(analysis_id: str, request: OwnerCheckRequest):
-    _check_owner(analysis_id, request.name, request.secret)
+def verify_owner(analysis_id: str, request: OwnerCheckRequest, x_client_id: uuid.UUID | None = Header(None)):
+    _check_owner(analysis_id, request.name, request.secret, _client_key(x_client_id))
     return {"ok": True}
 
 
 @app.post("/api/v1/analyses/{analysis_id}/delete")
-def delete_analysis(analysis_id: str, request: DeleteAnalysisRequest):
-    _check_owner(analysis_id, request.name, request.secret)
+def delete_analysis(analysis_id: str, request: DeleteAnalysisRequest, x_client_id: uuid.UUID | None = Header(None)):
+    _check_owner(analysis_id, request.name, request.secret, _client_key(x_client_id))
     if request.confirm_text.strip() != owner.CONFIRM_TEXT:
         raise HTTPException(status_code=400, detail=f"'{owner.CONFIRM_TEXT}'를 정확히 입력해야 합니다.")
     db.delete_analysis(analysis_id)
