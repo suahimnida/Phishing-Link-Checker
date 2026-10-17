@@ -551,10 +551,12 @@ function Result({ url, result, shareToken, onResultChange, onDeleted }) {
       {/* Report: 리포트 생성, PDF 보기·저장. 다른 분석 결과로 바뀌면 key로 상태를 초기화한다 */}
       {data.id && !unsaved && <ReportSection key={data.id} analysisId={data.id} shareToken={shareToken} />}
 
-      {/* 분석 결과 삭제: 공개 결과만. 분석할 때 입력한 사용자 식별 암호로 본인을 확인한다 */}
-      {/* 공유 링크로 연 화면은 읽기 전용이라 삭제 버튼을 숨긴다 (공개 결과는 '공개 분석'에서 열면 삭제할 수 있다) */}
-      {data.id && data.is_public && !unsaved && data.viewer !== "shared" && (
-        <DeleteSection analysisId={data.id} onDeleted={onDeleted} />
+      {/* 분석 결과 삭제: 분석할 때 입력한 성명과 사용자 식별 암호로 본인을 확인한다.
+          - 공개 결과: '공개 분석'에서 연 사람 누구나 삭제 화면을 볼 수 있다 (성명·암호를 알아야 삭제됨)
+          - 비공개 결과: 분석한 브라우저('내 기록')에서 열었을 때만 보인다
+          - 공유 링크로 연 화면은 읽기 전용이라 숨긴다 */}
+      {data.id && !unsaved && data.viewer !== "shared" && (data.is_public || data.viewer === "owner") && (
+        <DeleteSection analysisId={data.id} onDeleted={() => onDeleted?.(data.is_public)} />
       )}
 
       <PrivacyNotice />

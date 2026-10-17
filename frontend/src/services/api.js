@@ -228,10 +228,18 @@ export function shareUrl(token) {
   return `${window.location.origin}/?share=${encodeURIComponent(token)}`;
 }
 
+// 본인 확인·삭제 요청 헤더. 비공개 결과는 분석한 브라우저에서만 삭제할 수 있어 브라우저 ID를 함께 보낸다
+function ownerHeaders() {
+  const clientId = getSavedClientId();
+  return clientId
+    ? { "Content-Type": "application/json", "X-Client-Id": clientId }
+    : { "Content-Type": "application/json" };
+}
+
 export async function verifyOwner(analysisId, name, secret) {
   const response = await fetch(`${API_BASE_URL}/api/v1/analyses/${analysisId}/verify-owner`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: ownerHeaders(),
     body: JSON.stringify({ name, secret }),
   });
   if (!response.ok) {
@@ -245,7 +253,7 @@ export async function verifyOwner(analysisId, name, secret) {
 export async function deleteAnalysis(analysisId, name, secret, confirmText) {
   const response = await fetch(`${API_BASE_URL}/api/v1/analyses/${analysisId}/delete`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: ownerHeaders(),
     body: JSON.stringify({ name, secret, confirm_text: confirmText }),
   });
   if (!response.ok) {

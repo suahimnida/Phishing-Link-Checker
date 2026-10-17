@@ -32,10 +32,11 @@ function App() {
     setFocusRequest((n) => n + 1);
   };
 
-  const handleDeleted = () => {
+  // 삭제한 결과가 있던 목록으로 돌아간다 (공개 결과 → '공개 분석', 비공개 결과 → '내 기록')
+  const handleDeleted = (wasPublic) => {
     setAnalysisResult(null);
     setHistoryNotice("분석 결과를 삭제했습니다.");
-    setHistoryTab("public");
+    setHistoryTab(wasPublic ? "public" : "mine");
     setCurrentPage("history");
   };
 
