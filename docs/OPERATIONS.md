@@ -14,6 +14,14 @@
 | 재학습 | 기존 데이터 + 검토된 신고 라벨로 모델을 다시 학습한다 | `build_training_set.py` → `train_url_model.py` | 월 1회 |
 | 검증 | 평가 세트에서 기존 모델과 비교해 나빠지지 않았을 때만 교체한다 | `scripts/evaluate_model.py` | 재학습 때 |
 
+### 새 신고 알림 메일
+
+새 신고가 저장되면 관리자 메일로 알린다 (`backend/app/services/notify.py`).
+Render 무료 플랜은 SMTP 포트를 막으므로 HTTPS 메일 API(Resend)를 쓴다.
+Render 환경변수에 `RESEND_API_KEY`, `FEEDBACK_NOTIFY_TO`를 넣으면 켜지고, 비워 두면 보내지 않는다.
+메일은 일반 텍스트로만 보내고, 주소의 `?` 뒤는 가리며, 하루 50통(`FEEDBACK_MAIL_DAILY_LIMIT`)을 넘으면 보내지 않는다.
+켜져 있는지는 `/health`의 `llm.feedback_mail`에서 확인한다.
+
 ### 신고를 자동으로 반영하지 않는 이유
 
 공격자가 자기 피싱 사이트를 "실제로는 안전"이라고 반복 신고하면 허용 목록이나 학습 데이터가 오염된다.
@@ -75,4 +83,5 @@ python scripts/evaluate_model.py          # evaluation/results/ 에 지표 저�
 | 삭제 시점 | 서버 시작 때와 이후 하루 한 번 |
 | 로그 | URL의 `?`·`#` 뒤를 가리고 남긴다 (`privacy.mask_url`) |
 | 신고 활용 | 검토 후 블랙리스트·학습 데이터 개선에만 쓴다. 학습 라벨에는 `?` 뒤를 빼고 저장 |
+| 신고 알림 | 검토 담당자 메일로 전달 (메일 발송 서비스 Resend 경유, 주소의 `?` 뒤는 가림) |
 | 사용자 안내 | 결과 화면 하단 "개인정보 처리 안내", 분석 입력란 아래 안내 문구 |

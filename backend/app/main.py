@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -76,6 +76,7 @@ from app.services import (
     detections,
     followup,
     model,
+    notify,
     rag,
     report,
     report_pdf,
@@ -198,6 +199,7 @@ def _llm_status() -> dict:
         "database": db.describe().split(" ")[0],
         "retention_days": privacy.RETENTION_DAYS,
         "blacklist_date": blacklist.SOURCE_DATE,
+        "feedback_mail": notify.configured(),
         "cors_origins": [o for o in (os.environ.get("CORS_ORIGINS") or "http://localhost:5173").split(",") if o],
     }
 
@@ -456,6 +458,7 @@ FEEDBACK_MESSAGES = {
 def send_feedback(
     analysis_id: str,
     request: FeedbackRequest,
+    background_tasks: BackgroundTasks,
     share: str | None = Query(None, description="공유 링크 토큰"),
     x_client_id: uuid.UUID | None = Header(None),
 ):
@@ -464,6 +467,7 @@ def send_feedback(
     신고는 자동으로 반영하지 않는다. 공격자가 자기 피싱 사이트를 '정상'이라고 반복 신고해
     허용 목록이나 학습 데이터를 오염시킬 수 있으므로, 모두 '검토 대기'로 저장하고 사람이 검토한다
     (scripts/review_feedback.py). 같은 사용자는 한 결과에 한 번, 하루 20건까지만 보낼 수 있다.
+    새 신고가 저장되면 관리자 메일로 알린다 (notify.py, 응답을 보낸 뒤 백그라운드에서 발송).
     """
     client_key = _client_key(x_client_id)
     if client_key is None:
@@ -472,7 +476,7 @@ def send_feedback(
     since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
     if db.count_recent_feedback(client_key, since) >= FEEDBACK_DAILY_LIMIT:
         raise HTTPException(status_code=429, detail="오늘은 더 이상 의견을 보낼 수 없어요. 내일 다시 시도해 주세요.")
-    saved = db.save_feedback({
+    item = {
         "id": str(uuid.uuid4()),
         "analysis_id": analysis_id,
         "client_id": client_key,
@@ -480,7 +484,11 @@ def send_feedback(
         "verdict": analysis.verdict,
         "claim": request.claim,
         "comment": request.comment,
-    })
+    }
+    saved = db.save_feedback(item)
+    if saved:
+        # 메일은 응답을 보낸 뒤 보낸다. 메일 서비스가 느리거나 실패해도 사용자는 기다리지 않는다
+        background_tasks.add_task(notify.feedback_received, item)
     return FeedbackResponse(received=saved, message=FEEDBACK_MESSAGES[saved])
 
 
